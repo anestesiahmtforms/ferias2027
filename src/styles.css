@@ -18,20 +18,20 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .month-card { overflow: hidden; border: 1px solid #cbd8e2; border-radius: 10px; background: #fff; box-shadow: 0 5px 16px #164b7110; }
 .schedule-table-wrap { width: 100%; overflow-x: auto; }
-.schedule-table { width: 100%; min-width: 360px; border-collapse: collapse; table-layout: fixed; }
-.schedule-week-column { width: 19%; }
-.schedule-period-column { width: 22%; }
+.schedule-table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }
+.schedule-week-column { width: 22%; }
+.schedule-period-column { width: 25%; }
 .schedule-table th, .schedule-table td { border: 1px solid #cfd6dc; text-align: center; }
 .schedule-table .month-title { padding: 5px 8px; color: #fff; background: #0f4c81; }
 .schedule-table .month-title div { display: flex; align-items: baseline; justify-content: center; gap: 10px; }
 .schedule-table .month-title h2 { margin: 0; font-size: .95rem; letter-spacing: .04em; }
 .schedule-table .month-title span { font-size: .68rem; font-weight: 500; opacity: .88; }
 .schedule-table .column-headings { background: #eef2f5; color: #385267; }
-.schedule-table .column-headings th { padding: 5px 3px; font-size: .68rem; font-weight: 750; }
-.schedule-table .week-label { padding: 5px 4px; color: #334c60; background: #fff; font-size: .72rem; font-weight: 650; }
-.schedule-table .week-period { padding: 5px 2px; color: #2e414f; font-size: .72rem; white-space: nowrap; }
+.schedule-table .column-headings th { padding: 5px 2px; font-size: .62rem; font-weight: 750; }
+.schedule-table .week-label { padding: 5px 3px; color: #334c60; background: #fff; font-size: .68rem; font-weight: 650; }
+.schedule-table .week-period { padding: 5px 2px; color: #2e414f; font-size: .65rem; white-space: nowrap; }
 .schedule-table .slot-cell { padding: 0; }
-.slot { display: block; width: 100%; min-height: 30px; border: 0; border-radius: 0; background: #fff; color: #16824b; font-size: .78rem; font-weight: 750; cursor: pointer; }
+.slot { display: block; width: 100%; min-height: 30px; border: 0; border-radius: 0; background: #fff; color: #16824b; font-size: .72rem; font-weight: 750; cursor: pointer; }
 .slot.filled { background: #fff; color: #16824b; cursor: default; }
 .slot.locked { background: #fff; color: #a16363; cursor: not-allowed; }
 .slot:not(:disabled):hover { background: #f0f8f3; }
@@ -51,4 +51,4 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .audit-list { max-height: 260px; overflow: auto; display: grid; gap: 7px; text-align: left; }
 .audit-list div { display: grid; gap: 2px; padding: 8px; border-radius: 9px; background: #f2f7fa; font-size: .78rem; }
 .audit-list small { color: #65778a; }
-@media (max-width: 760px) { .shell { padding-inline: 12px; } .schedule-grid { grid-template-columns: 1fr; gap: 12px; } .schedule-table { min-width: 360px; } .schedule-table .month-title div { gap: 6px; flex-wrap: wrap; } .app-header { align-items: flex-start; } .brand { width: 88px; } }
+@media (max-width: 760px) { .shell { padding-inline: 12px; } .schedule-grid { grid-template-columns: 1fr; gap: 12px; } .schedule-table .month-title div { gap: 6px; flex-wrap: wrap; } .app-header { align-items: flex-start; } .brand { width: 88px; } }
