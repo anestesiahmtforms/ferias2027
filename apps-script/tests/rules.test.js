@@ -12,6 +12,7 @@ function loadRules() {
   const context = {
     console,
     Utilities: {
+      DigestAlgorithm: { SHA_256: 'SHA_256' },
       computeDigest: (_algorithm, value) => Array.from(Buffer.from(String(value), 'utf8'))
     }
   };

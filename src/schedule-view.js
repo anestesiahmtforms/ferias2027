@@ -16,7 +16,7 @@ function renderMonth(month) {
     <div class="month-heading"><h2>${escapeHtml(month.name)}</h2><span>${escapeHtml(month.phase || '')}</span></div>
     <div class="weeks">${(month.weeks || []).map(week => `<div class="week-row">
       <div class="week-info"><strong>${escapeHtml(week.label)}</strong><small>${escapeHtml(week.period)}</small></div>
-      <div class="slots">${(week.slots || []).map(slot => `<button class="slot ${escapeHtml(slot.state || 'available')}" type="button" ${slot.disabled ? 'disabled' : ''} data-slot="${escapeHtml(slot.id)}">${escapeHtml(slot.value || slot.label || 'Livre')}</button>`).join('')}</div>
+      <div class="slots">${(week.slots || []).map(slot => `<button class="slot ${escapeHtml(slot.state || 'available')}" type="button" ${slot.disabled ? 'disabled' : ''} data-slot="${escapeHtml(slot.id)}">${escapeHtml(slot.value || '')}</button>`).join('')}</div>
     </div>`).join('')}</div>
   </article>`;
 }
