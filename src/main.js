@@ -2,6 +2,7 @@ import './styles.css';
 import { renderApp, registerServiceWorker } from './app.js';
 import { createApi } from './api.js';
 import { openBookingModal } from './booking-modal.js';
+import { openAdminPanel } from './admin-view.js';
 
 const root = document.querySelector('#app');
 const endpoint = import.meta.env.VITE_APPS_SCRIPT_WEB_APP_URL || '';
@@ -22,7 +23,7 @@ async function boot() {
 function wireInteractions(siglas) {
   root.querySelector('[data-action="refresh"]')?.addEventListener('click', boot);
   root.querySelector('[data-action="admin"]')?.addEventListener('click', () => {
-    window.alert('A gestão administrativa será disponibilizada no próximo módulo.');
+    openAdminPanel({ api, onRefresh: boot });
   });
   root.querySelectorAll('[data-slot]').forEach(button => {
     if (button.disabled) return;
