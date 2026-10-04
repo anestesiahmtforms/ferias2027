@@ -1,0 +1,32 @@
+:root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #14324b; background: #f4f8fc; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button { font: inherit; }
+.shell { max-width: 1180px; margin: 0 auto; padding: 18px clamp(14px, 3vw, 32px) 42px; }
+.app-header { display: flex; align-items: center; gap: 14px; padding: 10px 4px 20px; }
+.brand { width: 104px; height: 42px; object-fit: contain; border-radius: 10px; box-shadow: 0 6px 16px #0f4c8124; }
+.eyebrow { margin: 0 0 2px; color: #137a71; font-size: .72rem; font-weight: 800; letter-spacing: .13em; }
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
+.subtitle { margin: 0; color: #65778a; font-size: .86rem; }
+.status-card { display: flex; align-items: center; gap: 9px; background: #fff; border: 1px solid #d9e7f2; border-radius: 14px; padding: 11px 14px; box-shadow: 0 5px 16px #164b7110; font-size: .87rem; }
+.status-dot { width: 9px; height: 9px; background: #18a67a; border-radius: 50%; box-shadow: 0 0 0 4px #18a67a1f; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 0 18px; }
+.toolbar button { border: 0; border-radius: 12px; padding: 10px 14px; cursor: pointer; font-weight: 750; }
+.primary { color: #fff; background: #0f4c81; }
+.secondary { color: #0f4c81; background: #dcecf8; }
+.schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.month-card { overflow: hidden; border: 1px solid #d8e7f2; border-radius: 18px; background: #fff; box-shadow: 0 7px 22px #164b7111; }
+.month-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 14px 16px; color: #fff; background: linear-gradient(135deg, #0f4c81, #147b90); }
+.month-heading h2 { margin: 0; font-size: 1rem; letter-spacing: .05em; }
+.month-heading span { font-size: .68rem; opacity: .82; }
+.week-row { display: grid; grid-template-columns: minmax(112px, 1fr) 1.25fr; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid #edf3f7; }
+.week-info { display: grid; gap: 2px; }
+.week-info strong { font-size: .8rem; color: #214965; }
+.week-info small { color: #758b9d; font-size: .72rem; }
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.slot { min-height: 34px; border: 1px solid #aad3db; border-radius: 9px; background: #eef9f8; color: #16716f; font-size: .73rem; font-weight: 800; cursor: pointer; }
+.slot.filled { border-color: #c4d3df; background: #edf1f5; color: #526b7b; cursor: default; }
+.slot.locked { border-color: #ead2d2; background: #fff2f2; color: #a16363; cursor: not-allowed; }
+.empty { padding: 28px; border: 1px dashed #b8cfdf; border-radius: 18px; color: #65778a; text-align: center; }
+@media (max-width: 760px) { .shell { padding-inline: 12px; } .schedule-grid { grid-template-columns: 1fr; gap: 12px; } .week-row { grid-template-columns: 1fr; gap: 7px; } .slots { grid-template-columns: repeat(3, 1fr); } .app-header { align-items: flex-start; } .brand { width: 88px; } }
