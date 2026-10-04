@@ -22,7 +22,8 @@ const CONFIG = {
 };
 
 function doGet() {
-  return resposta_({ ok: true, codigo: 'OK', escala: carregarEscala_() });
+  const sheet = planilha_();
+  return resposta_({ ok: true, codigo: 'OK', escala: carregarEscala_(), siglas: Object.keys(mapaRegras_(sheet.getSheetByName(CONFIG.rulesName))) });
 }
 
 function doPost(e) {
