@@ -34,8 +34,11 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .booking-modal h2 { margin: 0; color: #0f4c81; }
 .booking-modal p { margin: 0; color: #65778a; font-size: .88rem; }
 .booking-modal label { display: grid; gap: 5px; color: #214965; font-size: .8rem; font-weight: 750; }
-.booking-modal select, .booking-modal input { width: 100%; border: 1px solid #c7dbe8; border-radius: 10px; padding: 11px; background: #fbfdff; }
+.booking-modal select, .booking-modal input, .booking-modal textarea { width: 100%; border: 1px solid #c7dbe8; border-radius: 10px; padding: 11px; background: #fbfdff; }
 .modal-close { justify-self: end; border: 0; background: transparent; color: #647c8d; font-size: 1.5rem; cursor: pointer; }
+.admin-override { display: grid; gap: 10px; }
+.booking-modal textarea { width: 100%; resize: vertical; border: 1px solid #c7dbe8; border-radius: 10px; padding: 11px; background: #fbfdff; font: inherit; }
+.admin-modal h3 { margin: 4px 0 0; color: #214965; font-size: .9rem; }
 .form-error { min-height: 1.1em; color: #a84e4e !important; }
 .admin-ok { color: #16716f !important; font-weight: 800; }
 .audit-list { max-height: 260px; overflow: auto; display: grid; gap: 7px; text-align: left; }

@@ -7,7 +7,8 @@ test('admin PIN requires six digits', () => {
   assert.equal(validateAdminPin('990399').ok, true);
 });
 
-test('administrative override requires a justification', () => {
+test('administrative override accepts free text or clearing but requires justification', () => {
   assert.equal(validateOverrideForm({ vaga: 'fevereiro-0-0', value: 'FR', justification: '' }).ok, false);
-  assert.equal(validateOverrideForm({ vaga: 'fevereiro-0-0', value: 'FR', justification: 'Correção autorizada' }).ok, true);
+  assert.equal(validateOverrideForm({ vaga: 'fevereiro-0-0', value: 'Afastado ✓ + cobertura', justification: 'Correção autorizada' }).ok, true);
+  assert.equal(validateOverrideForm({ vaga: 'fevereiro-0-0', value: '', justification: 'Remoção autorizada' }).ok, true);
 });

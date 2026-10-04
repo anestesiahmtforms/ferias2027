@@ -8,7 +8,7 @@ const CONFIG = {
   auditName: 'AUDITORIA_PWA',
   blockedMonths: ['janeiro', 'julho'],
   maxWeeks: 2,
-  maxOverlapDays: 2,
+  maxOverlapDays: 3,
   rows: {
     janeiro: [5, 6, 7, 8], fevereiro: [5, 6, 7, 8], marco: [13, 14, 15, 16, 17], abril: [13, 14, 15, 16],
     maio: [22, 23, 24, 25], junho: [22, 23, 24, 25, 26], julho: [31, 32, 33, 34], agosto: [31, 32, 33, 34, 35],
@@ -115,7 +115,7 @@ const mensagens_ = {
   LIMITE_SEMANAS: 'Esta sigla já atingiu o limite de duas semanas.',
   RODADA_INICIAL: 'As férias conjuntas ainda não estão liberadas.',
   RODADA_CONJUNTA: 'A vaga inicial desta semana ainda deve ser preenchida.',
-  COINCIDENCIA_DIAS: 'A combinação ultrapassa dois dias úteis coincidentes.',
+  COINCIDENCIA_DIAS: 'A combinação ultrapassa três dias úteis coincidentes.',
   SIGLA_REPETIDA: 'A sigla já está registrada nesta semana.',
   SIGLA_INVALIDA: 'A sigla não está cadastrada nas regras.'
 };
@@ -208,7 +208,13 @@ function lerAuditoria_() {
 }
 
 function auditar_(action, sigla, vaga, result, justification) {
-  obterAuditoriaSheet_().appendRow([new Date(), action, sigla || '', vaga || '', result || '', justification || '']);
+  const sheet = obterAuditoriaSheet_();
+  const row = sheet.getLastRow() + 1;
+  sheet.getRange(row, 1).setValue(new Date());
+  const fields = [action, sigla, vaga, result, justification].map(value =>
+    SpreadsheetApp.newRichTextValue().setText(String(value == null ? '' : value)).build()
+  );
+  sheet.getRange(row, 2, 1, fields.length).setRichTextValues([fields]);
 }
 
 function trocarPin_(request) {
@@ -223,8 +229,22 @@ function overrideVaga_(request) {
   if (!request.justification || !String(request.justification).trim()) return { ok: false, codigo: 'JUSTIFICATIVA_OBRIGATORIA', mensagem: 'Informe a justificativa.' };
   const vaga = localizarVaga_(request.vaga);
   if (!vaga) return { ok: false, codigo: 'VAGA_INVALIDA', mensagem: 'Vaga não reconhecida.' };
-  const cell = planilha_().getSheetByName(CONFIG.sheetName).getRange(vaga.row, vaga.column);
-  cell.setValue(normalizar_(request.value));
-  auditar_('admin_override', request.value, request.vaga, 'OK', request.justification);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const cell = planilha_().getSheetByName(CONFIG.sheetName).getRange(vaga.row, vaga.column);
+    const value = String(request.value == null ? '' : request.value);
+    const validation = cell.getDataValidation();
+    if (validation) cell.clearDataValidations();
+    try {
+      if (value === '') cell.clearContent();
+      else cell.setRichTextValue(SpreadsheetApp.newRichTextValue().setText(value).build());
+    } finally {
+      if (validation) cell.setDataValidation(validation);
+    }
+    auditar_('admin_override', value, request.vaga, 'OK', request.justification);
+  } finally {
+    lock.releaseLock();
+  }
   return { ok: true, codigo: 'OK', mensagem: 'Ajuste administrativo aplicado.', escala: carregarEscala_() };
 }

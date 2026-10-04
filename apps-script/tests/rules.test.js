@@ -55,9 +55,10 @@ test('rejects joint vacation before the initial round is complete', () => {
   assert.equal(validarReserva_({ ...base(), slotIndex: 1, round: 'individual' }).codigo, 'RODADA_INICIAL');
 });
 
-test('rejects more than two coincident working days in the joint round', () => {
+test('allows three coincident working days and rejects four in the joint round', () => {
   const { validarReserva_ } = loadRules();
-  assert.equal(validarReserva_({ ...base(), slotIndex: 1, round: 'conjunta', overlapDays: 3 }).codigo, 'COINCIDENCIA_DIAS');
+  assert.equal(validarReserva_({ ...base(), slotIndex: 1, round: 'conjunta', overlapDays: 3 }).ok, true);
+  assert.equal(validarReserva_({ ...base(), slotIndex: 1, round: 'conjunta', overlapDays: 4 }).codigo, 'COINCIDENCIA_DIAS');
 });
 
 test('rejects an already occupied or repeated week', () => {
