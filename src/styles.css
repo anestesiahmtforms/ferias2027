@@ -29,4 +29,12 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .slot.filled { border-color: #c4d3df; background: #edf1f5; color: #526b7b; cursor: default; }
 .slot.locked { border-color: #ead2d2; background: #fff2f2; color: #a16363; cursor: not-allowed; }
 .empty { padding: 28px; border: 1px dashed #b8cfdf; border-radius: 18px; color: #65778a; text-align: center; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 18px; background: #0d2b3f80; }
+.booking-modal { width: min(100%, 390px); display: grid; gap: 12px; padding: 22px; border-radius: 18px; background: #fff; box-shadow: 0 20px 60px #08243840; }
+.booking-modal h2 { margin: 0; color: #0f4c81; }
+.booking-modal p { margin: 0; color: #65778a; font-size: .88rem; }
+.booking-modal label { display: grid; gap: 5px; color: #214965; font-size: .8rem; font-weight: 750; }
+.booking-modal select, .booking-modal input { width: 100%; border: 1px solid #c7dbe8; border-radius: 10px; padding: 11px; background: #fbfdff; }
+.modal-close { justify-self: end; border: 0; background: transparent; color: #647c8d; font-size: 1.5rem; cursor: pointer; }
+.form-error { min-height: 1.1em; color: #a84e4e !important; }
 @media (max-width: 760px) { .shell { padding-inline: 12px; } .schedule-grid { grid-template-columns: 1fr; gap: 12px; } .week-row { grid-template-columns: 1fr; gap: 7px; } .slots { grid-template-columns: repeat(3, 1fr); } .app-header { align-items: flex-start; } .brand { width: 88px; } }
