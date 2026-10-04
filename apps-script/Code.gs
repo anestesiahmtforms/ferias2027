@@ -52,7 +52,7 @@ function validarReserva_(input) {
 }
 
 function hashPin_(pin, salt) {
-  const bytes = Utilities.computeDigest('SHA_256', String(salt) + ':' + String(pin));
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(salt) + ':' + String(pin));
   return bytes.map(byte => {
     const value = byte < 0 ? byte + 256 : byte;
     return ('0' + value.toString(16)).slice(-2);

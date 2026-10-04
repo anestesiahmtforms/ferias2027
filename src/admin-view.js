@@ -67,7 +67,6 @@ export function openAdminPanel({ api, onRefresh = () => {} }) {
     valueInput.type = 'text';
     valueInput.maxLength = 50000;
     valueInput.autocomplete = 'off';
-    valueInput.placeholder = 'Texto ou símbolos; deixe vazio para remover a marcação';
     valueLabel.append(valueInput);
 
     const justificationLabel = document.createElement('label');
@@ -108,12 +107,6 @@ export function openAdminPanel({ api, onRefresh = () => {} }) {
       auditList.append(empty);
     }
     content.append(auditList);
-
-    function syncValue() {
-      valueInput.value = byId.get(slotSelect.value)?.value || '';
-    }
-    slotSelect.addEventListener('change', syncValue);
-    syncValue();
 
     form.addEventListener('submit', async event => {
       event.preventDefault();
@@ -158,3 +151,4 @@ export function openAdminPanel({ api, onRefresh = () => {} }) {
   });
   document.body.append(backdrop);
 }
+
