@@ -9,7 +9,7 @@ export function renderApp(root, model = {}) {
         <div>
           <p class="eyebrow">SAHMT</p>
           <h1>Escala de férias 2027</h1>
-          <p class="subtitle">Escolha protegida e atualizada em tempo real.</p>
+          <p class="subtitle">Use diretamente pelo navegador · escolha protegida e atualizada em tempo real.</p>
         </div>
       </header>
       <section class="status-card" aria-live="polite">
