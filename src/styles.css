@@ -16,18 +16,25 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .primary { color: #fff; background: #0f4c81; }
 .secondary { color: #0f4c81; background: #dcecf8; }
 .schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.month-card { overflow: hidden; border: 1px solid #d8e7f2; border-radius: 18px; background: #fff; box-shadow: 0 7px 22px #164b7111; }
-.month-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 14px 16px; color: #fff; background: linear-gradient(135deg, #0f4c81, #147b90); }
-.month-heading h2 { margin: 0; font-size: 1rem; letter-spacing: .05em; }
-.month-heading span { font-size: .68rem; opacity: .82; }
-.week-row { display: grid; grid-template-columns: minmax(112px, 1fr) 1.25fr; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid #edf3f7; }
-.week-info { display: grid; gap: 2px; }
-.week-info strong { font-size: .8rem; color: #214965; }
-.week-info small { color: #758b9d; font-size: .72rem; }
-.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-.slot { min-height: 34px; border: 1px solid #aad3db; border-radius: 9px; background: #eef9f8; color: #16716f; font-size: .73rem; font-weight: 800; cursor: pointer; }
-.slot.filled { border-color: #c4d3df; background: #edf1f5; color: #526b7b; cursor: default; }
-.slot.locked { border-color: #ead2d2; background: #fff2f2; color: #a16363; cursor: not-allowed; }
+.month-card { overflow: hidden; border: 1px solid #cbd8e2; border-radius: 10px; background: #fff; box-shadow: 0 5px 16px #164b7110; }
+.schedule-table-wrap { width: 100%; overflow-x: auto; }
+.schedule-table { width: 100%; min-width: 360px; border-collapse: collapse; table-layout: fixed; }
+.schedule-week-column { width: 19%; }
+.schedule-period-column { width: 22%; }
+.schedule-table th, .schedule-table td { border: 1px solid #cfd6dc; text-align: center; }
+.schedule-table .month-title { padding: 5px 8px; color: #fff; background: #0f4c81; }
+.schedule-table .month-title div { display: flex; align-items: baseline; justify-content: center; gap: 10px; }
+.schedule-table .month-title h2 { margin: 0; font-size: .95rem; letter-spacing: .04em; }
+.schedule-table .month-title span { font-size: .68rem; font-weight: 500; opacity: .88; }
+.schedule-table .column-headings { background: #eef2f5; color: #385267; }
+.schedule-table .column-headings th { padding: 5px 3px; font-size: .68rem; font-weight: 750; }
+.schedule-table .week-label { padding: 5px 4px; color: #334c60; background: #fff; font-size: .72rem; font-weight: 650; }
+.schedule-table .week-period { padding: 5px 2px; color: #2e414f; font-size: .72rem; white-space: nowrap; }
+.schedule-table .slot-cell { padding: 0; }
+.slot { display: block; width: 100%; min-height: 30px; border: 0; border-radius: 0; background: #fff; color: #16824b; font-size: .78rem; font-weight: 750; cursor: pointer; }
+.slot.filled { background: #fff; color: #16824b; cursor: default; }
+.slot.locked { background: #fff; color: #a16363; cursor: not-allowed; }
+.slot:not(:disabled):hover { background: #f0f8f3; }
 .empty { padding: 28px; border: 1px dashed #b8cfdf; border-radius: 18px; color: #65778a; text-align: center; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 18px; background: #0d2b3f80; }
 .booking-modal { width: min(100%, 390px); display: grid; gap: 12px; padding: 22px; border-radius: 18px; background: #fff; box-shadow: 0 20px 60px #08243840; }
@@ -44,4 +51,4 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .audit-list { max-height: 260px; overflow: auto; display: grid; gap: 7px; text-align: left; }
 .audit-list div { display: grid; gap: 2px; padding: 8px; border-radius: 9px; background: #f2f7fa; font-size: .78rem; }
 .audit-list small { color: #65778a; }
-@media (max-width: 760px) { .shell { padding-inline: 12px; } .schedule-grid { grid-template-columns: 1fr; gap: 12px; } .week-row { grid-template-columns: 1fr; gap: 7px; } .slots { grid-template-columns: repeat(3, 1fr); } .app-header { align-items: flex-start; } .brand { width: 88px; } }
+@media (max-width: 760px) { .shell { padding-inline: 12px; } .schedule-grid { grid-template-columns: 1fr; gap: 12px; } .schedule-table { min-width: 360px; } .schedule-table .month-title div { gap: 6px; flex-wrap: wrap; } .app-header { align-items: flex-start; } .brand { width: 88px; } }

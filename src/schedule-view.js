@@ -13,11 +13,20 @@ export function renderSchedule(root, schedule, { onSlot = () => {} } = {}) {
 
 function renderMonth(month) {
   return `<article class="month-card">
-    <div class="month-heading"><h2>${escapeHtml(month.name)}</h2><span>${escapeHtml(month.phase || '')}</span></div>
-    <div class="weeks">${(month.weeks || []).map(week => `<div class="week-row">
-      <div class="week-info"><strong>${escapeHtml(week.label)}</strong><small>${escapeHtml(week.period)}</small></div>
-      <div class="slots">${(week.slots || []).map(slot => `<button class="slot ${escapeHtml(slot.state || 'available')}" type="button" ${slot.disabled ? 'disabled' : ''} data-slot="${escapeHtml(slot.id)}">${escapeHtml(slot.value || '')}</button>`).join('')}</div>
-    </div>`).join('')}</div>
+    <div class="schedule-table-wrap">
+      <table class="schedule-table" aria-label="Escala de ${escapeHtml(month.name)}">
+        <colgroup><col class="schedule-week-column"><col class="schedule-period-column"><col><col><col></colgroup>
+        <thead>
+          <tr><th class="month-title" colspan="5"><div><h2>${escapeHtml(month.name)}</h2><span>${escapeHtml(month.phase || '')}</span></div></th></tr>
+          <tr class="column-headings"><th scope="col">SEMANA</th><th scope="col">PERÍODO</th><th scope="col">SIGLA 1</th><th scope="col">SIGLA 2</th><th scope="col">SIGLA 3</th></tr>
+        </thead>
+        <tbody>${(month.weeks || []).map(week => `<tr>
+          <th class="week-label" scope="row">${escapeHtml(week.label)}</th>
+          <td class="week-period">${escapeHtml(week.period)}</td>
+          ${(week.slots || []).map(slot => `<td class="slot-cell"><button class="slot ${escapeHtml(slot.state || 'available')}" type="button" aria-label="${escapeHtml(`${slot.label || 'Sigla'} ${slot.value ? slot.value : 'vaga vazia'}, ${week.label}, ${week.period}`)}" ${slot.disabled ? 'disabled' : ''} data-slot="${escapeHtml(slot.id)}">${escapeHtml(slot.value || '')}</button></td>`).join('')}
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
   </article>`;
 }
 

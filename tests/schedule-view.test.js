@@ -14,12 +14,18 @@ const schedule = [{
   }]
 }];
 
-test('renders existing values and leaves empty cells without sigla placeholders', () => {
+test('renders the spreadsheet-style date and horizontal sigla columns', () => {
   const html = buildScheduleMarkup(schedule);
   assert.match(html, /JANEIRO/);
+  assert.match(html, /SEMANA/);
+  assert.match(html, /PERÍODO/);
+  assert.match(html, /SIGLA 1/);
+  assert.match(html, /SIGLA 2/);
+  assert.match(html, /SIGLA 3/);
+  assert.match(html, /04 A 10\/01/);
   assert.match(html, /RO/);
   assert.match(html, /disabled/);
-  assert.doesNotMatch(html, /SIGLA [123]/);
+  assert.match(html, /<td class="slot-cell"><button[^>]*><\/button><\/td>/);
 });
 
 test('API adapter sends reservation as a JSON request', async () => {
