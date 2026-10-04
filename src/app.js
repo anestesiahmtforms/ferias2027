@@ -1,3 +1,5 @@
+import { buildScheduleMarkup } from './schedule-view.js';
+
 export function renderApp(root, model = {}) {
   const months = model.months || [];
   root.innerHTML = `
@@ -19,19 +21,9 @@ export function renderApp(root, model = {}) {
         <button class="secondary" type="button" data-action="admin">Gestão administrativa</button>
       </section>
       <section class="schedule-grid" aria-label="Escala de férias">
-        ${months.length ? months.map(renderMonth).join('') : '<div class="empty">A escala será carregada aqui.</div>'}
+        ${buildScheduleMarkup(months)}
       </section>
     </main>`;
-}
-
-function renderMonth(month) {
-  return `<article class="month-card">
-    <div class="month-heading"><h2>${month.name}</h2><span>${month.phase || ''}</span></div>
-    <div class="weeks">${(month.weeks || []).map(week => `<div class="week-row">
-      <div class="week-info"><strong>${week.label}</strong><small>${week.period}</small></div>
-      <div class="slots">${(week.slots || []).map(slot => `<button class="slot ${slot.state || 'available'}" type="button" ${slot.disabled ? 'disabled' : ''} data-slot="${slot.id}">${slot.value || slot.label || 'Livre'}</button>`).join('')}</div>
-    </div>`).join('')}</div>
-  </article>`;
 }
 
 export function registerServiceWorker() {
