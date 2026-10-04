@@ -17,8 +17,8 @@ function renderMonth(month) {
       <table class="schedule-table" aria-label="Escala de ${escapeHtml(month.name)}">
         <colgroup><col class="schedule-week-column"><col class="schedule-period-column"><col><col><col></colgroup>
         <thead>
-          <tr><th class="month-title" colspan="5"><div><h2>${escapeHtml(month.name)}</h2><span>${escapeHtml(month.phase || '')}</span></div></th></tr>
-          <tr class="column-headings"><th scope="col">SEMANA</th><th scope="col">PERÍODO</th><th scope="col">SIGLA 1</th><th scope="col">SIGLA 2</th><th scope="col">SIGLA 3</th></tr>
+          <tr><th class="month-title" colspan="5"><div><h2>${escapeHtml(month.name)}</h2>${month.phase && month.phase !== 'Rodada individual' ? `<span>${escapeHtml(month.phase)}</span>` : ''}</div></th></tr>
+          <tr class="column-headings"><th scope="col">SEMANA</th><th scope="col">PERÍODO</th><th scope="col" aria-label="Sigla 1"></th><th scope="col" aria-label="Sigla 2"></th><th scope="col" aria-label="Sigla 3"></th></tr>
         </thead>
         <tbody>${(month.weeks || []).map(week => `<tr>
           <th class="week-label" scope="row">${escapeHtml(week.label)}</th>

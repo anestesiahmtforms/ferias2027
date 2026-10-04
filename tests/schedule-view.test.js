@@ -19,9 +19,8 @@ test('renders the spreadsheet-style date and horizontal sigla columns', () => {
   assert.match(html, /JANEIRO/);
   assert.match(html, /SEMANA/);
   assert.match(html, /PERÍODO/);
-  assert.match(html, /SIGLA 1/);
-  assert.match(html, /SIGLA 2/);
-  assert.match(html, /SIGLA 3/);
+  assert.doesNotMatch(html, />SIGLA [123]<\/th>/);
+  assert.doesNotMatch(html, /Rodada individual/);
   assert.match(html, /04 A 10\/01/);
   assert.match(html, /RO/);
   assert.match(html, /disabled/);
