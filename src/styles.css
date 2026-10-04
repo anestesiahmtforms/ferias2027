@@ -37,4 +37,8 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .booking-modal select, .booking-modal input { width: 100%; border: 1px solid #c7dbe8; border-radius: 10px; padding: 11px; background: #fbfdff; }
 .modal-close { justify-self: end; border: 0; background: transparent; color: #647c8d; font-size: 1.5rem; cursor: pointer; }
 .form-error { min-height: 1.1em; color: #a84e4e !important; }
+.admin-ok { color: #16716f !important; font-weight: 800; }
+.audit-list { max-height: 260px; overflow: auto; display: grid; gap: 7px; text-align: left; }
+.audit-list div { display: grid; gap: 2px; padding: 8px; border-radius: 9px; background: #f2f7fa; font-size: .78rem; }
+.audit-list small { color: #65778a; }
 @media (max-width: 760px) { .shell { padding-inline: 12px; } .schedule-grid { grid-template-columns: 1fr; gap: 12px; } .week-row { grid-template-columns: 1fr; gap: 7px; } .slots { grid-template-columns: repeat(3, 1fr); } .app-header { align-items: flex-start; } .brand { width: 88px; } }
