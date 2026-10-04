@@ -1,10 +1,10 @@
 # Escala de férias 2027
 
-PWA exclusivo da equipe SAHMT para consulta e escolha protegida das férias de 2027.
+Aplicação web exclusiva da equipe SAHMT para consulta e escolha protegida das férias de 2027. O uso normal é abrir o endereço no navegador; instalação no Android/iPhone é opcional e não é necessária.
 
 ## Arquitetura
 
-- Interface: GitHub Pages, mobile-first, instalável como PWA.
+- Interface: GitHub Pages, mobile-first, acessível diretamente pelo navegador (recursos PWA opcionais).
 - Serviço: Web App Apps Script executado com a conta proprietária da planilha.
 - Fonte administrativa: planilha Google `FÉRIAS-2027`.
 - Auditoria: aba protegida `AUDITORIA_PWA`.
