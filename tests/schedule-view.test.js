@@ -14,12 +14,12 @@ const schedule = [{
   }]
 }];
 
-test('renders blocked existing values and available slot labels', () => {
+test('renders existing values and leaves empty cells without sigla placeholders', () => {
   const html = buildScheduleMarkup(schedule);
   assert.match(html, /JANEIRO/);
   assert.match(html, /RO/);
   assert.match(html, /disabled/);
-  assert.match(html, /SIGLA 2/);
+  assert.doesNotMatch(html, /SIGLA [123]/);
 });
 
 test('API adapter sends reservation as a JSON request', async () => {
