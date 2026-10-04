@@ -1,0 +1,14 @@
+{
+  "name": "Escala de férias 2027",
+  "short_name": "Férias 2027",
+  "description": "Escolha protegida das férias da equipe SAHMT.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f8fc",
+  "theme_color": "#0f4c81",
+  "icons": [
+    { "src": "./assets/sahmt-logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
