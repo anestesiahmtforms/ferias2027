@@ -7,6 +7,8 @@ const CONFIG = {
   abaFerias: 'FERIAS 2027',
   abaRegras: 'REGRAS',
   descricaoProtecao: 'CONTROLE_FERIAS_2027',
+  maxSemanas: 2,
+  siglasUmaSemana: ['BA', 'FR', 'GB', 'L2', 'LD', 'LC', 'LU', 'MA', 'RA', 'RC', 'RO', 'WE', 'DN', 'AL'],
   mesesBloqueados: ['janeiro', 'julho'],
   linhas: {
     janeiro: [5, 6, 7, 8], fevereiro: [5, 6, 7, 8],
@@ -89,9 +91,10 @@ function onEditFerias(e) {
 
   const regras = mapaRegras_();
   const semanasJaMarcadas = contarSemanasDaSigla_(range.getSheet(), sigla, range.getA1Notation());
-  if (atingiuLimiteSemanas_(semanasJaMarcadas)) {
+  if (atingiuLimiteSemanas_(semanasJaMarcadas, sigla)) {
     range.clearContent();
-    avisar_(range.getSheet(), sigla + ' já atingiu o limite de 2 semanas de férias.');
+    const limite = limiteSemanasPorSigla_(sigla);
+    avisar_(range.getSheet(), sigla + ' já atingiu o limite de ' + limite + (limite === 1 ? ' semana' : ' semanas') + ' nesta rodada.');
     return;
   }
   const outrasSiglas = siglasDaSemana_(range.getSheet(), vaga, range.getA1Notation());
@@ -141,8 +144,12 @@ function deveValidarCoincidencia_(rodada) {
   return rodada === 'conjunta';
 }
 
-function atingiuLimiteSemanas_(semanasJaMarcadas) {
-  return semanasJaMarcadas >= 2;
+function limiteSemanasPorSigla_(sigla) {
+  return CONFIG.siglasUmaSemana.includes(normalizarSigla_(sigla)) ? 1 : CONFIG.maxSemanas;
+}
+
+function atingiuLimiteSemanas_(semanasJaMarcadas, sigla) {
+  return semanasJaMarcadas >= limiteSemanasPorSigla_(sigla);
 }
 
 function validarConjuntoSemana_(siglasExistentes, siglaNova, regras, validarCoincidencia = true) {
@@ -261,7 +268,7 @@ function executarTestes() {
     () => !vagaPermitidaNaRodada_({ mes: 'janeiro', indiceSigla: 0 }, 'individual'),
     () => vagaPermitidaNaRodada_({ mes: 'fevereiro', indiceSigla: 1 }, 'conjunta'),
     () => !deveValidarCoincidencia_('individual') && deveValidarCoincidencia_('conjunta'),
-    () => !atingiuLimiteSemanas_(1) && atingiuLimiteSemanas_(2)
+    () => !atingiuLimiteSemanas_(1, 'AA') && atingiuLimiteSemanas_(2, 'AA')
   ];
   if (!testes.every(teste => teste())) throw new Error('Falha em um teste interno do controle de férias.');
   SpreadsheetApp.getActive().toast('Testes internos aprovados.', 'Férias 2027', 6);

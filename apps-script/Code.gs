@@ -8,6 +8,7 @@ const CONFIG = {
   auditName: 'AUDITORIA_PWA',
   blockedMonths: ['janeiro', 'julho'],
   maxWeeks: 2,
+  singleWeekSiglas: ['BA', 'FR', 'GB', 'L2', 'LD', 'LC', 'LU', 'MA', 'RA', 'RC', 'RO', 'WE', 'DN', 'AL'],
   maxOverlapDays: 3,
   halfDayOverlapPairsByWeekday: [
     [['CH', 'FL']],
@@ -54,7 +55,8 @@ function validarReserva_(input) {
   if (!data.allowedSiglas || !data.allowedSiglas[sigla]) return { ok: false, codigo: 'SIGLA_INVALIDA' };
   if (CONFIG.blockedMonths.includes(String(data.month || '').trim().toLowerCase())) return { ok: false, codigo: 'MES_BLOQUEADO' };
   if (normalizar_(data.currentValue)) return { ok: false, codigo: 'VAGA_OCUPADA' };
-  if (Number(data.weeksForSigla || 0) >= CONFIG.maxWeeks) return { ok: false, codigo: 'LIMITE_SEMANAS' };
+  const maxWeeks = limiteSemanas_(sigla);
+  if (Number(data.weeksForSigla || 0) >= maxWeeks) return { ok: false, codigo: 'LIMITE_SEMANAS', maxWeeks };
   if (Array.isArray(data.weekValues) && data.weekValues.map(normalizar_).includes(sigla)) return { ok: false, codigo: 'SIGLA_REPETIDA' };
   if (data.round === 'individual' && Number(data.slotIndex) !== 0) return { ok: false, codigo: 'RODADA_INICIAL' };
   if (data.round === 'conjunta' && Number(data.slotIndex) === 0) return { ok: false, codigo: 'RODADA_CONJUNTA' };
@@ -72,6 +74,10 @@ function hashPin_(pin, salt) {
 
 function verificarPin_(pin, expectedHash, salt) {
   return !!pin && hashPin_(pin, salt) === expectedHash;
+}
+
+function limiteSemanas_(sigla) {
+  return CONFIG.singleWeekSiglas.includes(normalizar_(sigla)) ? 1 : CONFIG.maxWeeks;
 }
 
 function chaveSessaoMembro_(token) { return 'MEMBER_SESSION_SIGLA_' + String(token || ''); }
@@ -225,6 +231,8 @@ function mensagemResultado_(result) {
   const overlap = Number(result.overlapDays || 0);
   const mensagem = result.codigo === 'COINCIDENCIA_DIAS'
     ? `Esta semana coincide em ${formatarDias_(overlap)} com outra sigla; o limite permitido é ${formatarDias_(CONFIG.maxOverlapDays)}.`
+    : result.codigo === 'LIMITE_SEMANAS'
+      ? `Esta sigla já atingiu o limite de ${result.maxWeeks || 1} ${Number(result.maxWeeks || 1) === 1 ? 'semana' : 'semanas'} nesta rodada.`
     : (mensagens_[result.codigo] || 'A escolha não foi autorizada.');
   return { ...result, coincidenciaDias: overlap, mensagem };
 }
@@ -232,7 +240,6 @@ function mensagemResultado_(result) {
 const mensagens_ = {
   MES_BLOQUEADO: 'Janeiro e julho estão bloqueados nesta rodada.',
   VAGA_OCUPADA: 'Esta vaga já foi preenchida.',
-  LIMITE_SEMANAS: 'Esta sigla já atingiu o limite de duas semanas.',
   RODADA_INICIAL: 'As férias conjuntas ainda não estão liberadas.',
   RODADA_CONJUNTA: 'A vaga inicial desta semana ainda deve ser preenchida.',
   COINCIDENCIA_DIAS: 'A combinação ultrapassa três dias úteis coincidentes.',
