@@ -162,7 +162,7 @@ function atingiuLimiteSemanas_(semanasJaMarcadas, sigla) {
 
 function contarSemanasPorSigla_(aba) {
   const contagem = {};
-  Object.keys(CONFIG.linhas).forEach(mes => {
+  Object.keys(CONFIG.linhas).filter(mes => !mesBloqueado_(mes)).forEach(mes => {
     const linhas = CONFIG.linhas[mes];
     const colunas = CONFIG.colunas[mes];
     aba.getRange(linhas[0], colunas[0], linhas.length, colunas.length).getDisplayValues().forEach(linha => {
@@ -258,6 +258,7 @@ function siglasDaSemana_(aba, vaga, a1Excluido) {
 function contarSemanasDaSigla_(aba, sigla, a1Excluido = '') {
   const procurada = normalizarSigla_(sigla);
   return todasVagas_().reduce((total, vaga) => {
+    if (mesBloqueado_(vaga.mes)) return total;
     const range = aba.getRange(vaga.linha, vaga.coluna);
     if (range.getA1Notation() === a1Excluido) return total;
     return total + (normalizarSigla_(range.getDisplayValue()) === procurada ? 1 : 0);

@@ -92,7 +92,7 @@ function limiteSemanas_(sigla) {
 
 function contarSemanasPorSigla_(sheet) {
   const counts = {};
-  Object.keys(CONFIG.rows).forEach(month => {
+  Object.keys(CONFIG.rows).filter(month => !CONFIG.blockedMonths.includes(month)).forEach(month => {
     const rows = CONFIG.rows[month];
     const columns = CONFIG.columns[month];
     sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
