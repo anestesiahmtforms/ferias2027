@@ -8,29 +8,46 @@ const root = document.querySelector('#app');
 const endpoint = import.meta.env.VITE_APPS_SCRIPT_WEB_APP_URL || '';
 const api = createApi(endpoint);
 let activeSession = null;
+let currentSchedule = null;
+let currentSiglas = [];
+
+function renderCurrentSchedule(status = 'Escala atualizada.') {
+  renderApp(root, {
+    status,
+    months: currentSchedule?.escala || [],
+    session: activeSession
+  });
+  wireInteractions(currentSiglas);
+}
+
+function applyScheduleResponse(response, status = 'Escala atualizada.') {
+  if (!response?.ok || !Array.isArray(response.escala)) return false;
+  currentSchedule = response;
+  if (Array.isArray(response.siglas)) currentSiglas = response.siglas;
+  renderCurrentSchedule(status);
+  return true;
+}
 
 async function boot() {
-  renderApp(root, { status: endpoint ? 'Atualizando escala...' : 'Serviço ainda não configurado.', session: activeSession });
-  if (!endpoint) return;
+  if (!endpoint) {
+    renderApp(root, { status: 'Serviço ainda não configurado.', months: currentSchedule?.escala || [], session: activeSession });
+    return;
+  }
+  if (!currentSchedule) renderApp(root, { status: 'Carregando escala...', session: activeSession });
   try {
     const response = await api.fetchSchedule(activeSession?.token);
     if (!response.ok) {
       if (activeSession && response.codigo === 'SESSAO_ENCERRADA') {
         activeSession = null;
         const publicResponse = await api.fetchSchedule();
-        if (publicResponse.ok) {
-          renderApp(root, { status: 'A sessão foi encerrada ou reaberta pelo administrador.', months: publicResponse.escala || [] });
-          wireInteractions(publicResponse.siglas || []);
-          return;
-        }
+        if (applyScheduleResponse(publicResponse, 'A sessão foi encerrada ou reaberta pelo administrador.')) return;
       }
-      renderApp(root, { status: response.mensagem || 'Não foi possível atualizar a escala.', session: activeSession });
+      renderCurrentSchedule(response.mensagem || 'Não foi possível atualizar a escala.');
       return;
     }
-    renderApp(root, { status: 'Escala atualizada.', months: response.escala || [], session: activeSession });
-    wireInteractions(response.siglas || []);
+    applyScheduleResponse(response);
   } catch (_error) {
-    renderApp(root, { status: 'Não foi possível atualizar. Consulte novamente quando houver conexão.', session: activeSession });
+    renderCurrentSchedule('Não foi possível atualizar. Consulte novamente quando houver conexão.');
   }
 }
 
@@ -60,8 +77,11 @@ function wireInteractions(siglas) {
         try {
           const result = await api.cancelOwnReservation(button.dataset.slot, activeSession?.token);
           if (!result.ok) window.alert(result.mensagem || 'Não foi possível limpar a escolha.');
-        } catch (_error) { window.alert('Falha de conexão ao limpar a escolha.'); }
-        await boot();
+          else if (!applyScheduleResponse(result)) await boot();
+        } catch (_error) {
+          window.alert('Falha de conexão ao limpar a escolha.');
+          await boot();
+        }
         return;
       }
       openBookingModal(button.dataset.slot, {
@@ -69,8 +89,14 @@ function wireInteractions(siglas) {
         session: activeSession,
         startSession: (sigla, pin) => api.startMemberSession(sigla, pin),
         submit: values => api.submitReservation(values),
-        onSession: async session => { activeSession = session; await boot(); },
-        onDone: boot
+        onSession: session => {
+          activeSession = session;
+          renderCurrentSchedule('Sessão de lançamento iniciada.');
+        },
+        onDone: result => {
+          if (!applyScheduleResponse(result)) void boot();
+        },
+        onFailure: () => { void boot(); }
       });
     });
   });

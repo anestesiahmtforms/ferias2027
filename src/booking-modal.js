@@ -4,7 +4,7 @@ export function validateBookingForm({ sigla, pin }) {
   return { ok: true };
 }
 
-export function openBookingModal(slotId, { siglas = [], session = null, startSession = async () => ({ ok: false }), submit = async () => ({ ok: false }), onSession = async () => {}, onDone = () => {} } = {}) {
+export function openBookingModal(slotId, { siglas = [], session = null, startSession = async () => ({ ok: false }), submit = async () => ({ ok: false }), onSession = async () => {}, onDone = () => {}, onFailure = () => {} } = {}) {
   return new Promise(resolve => {
     let currentSession = session;
     const backdrop = document.createElement('div');
@@ -55,6 +55,7 @@ export function openBookingModal(slotId, { siglas = [], session = null, startSes
         button.disabled = false;
         error.textContent = result.mensagem || 'A escolha foi recusada.';
         if (result.codigo === 'COINCIDENCIA_DIAS') error.classList.add('overlap-warning');
+        onFailure(result);
       }
     });
     document.body.append(backdrop);

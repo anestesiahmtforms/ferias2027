@@ -37,7 +37,9 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .slot.filled { background: #fff; color: #16824b; cursor: default; }
 .slot.filled.clearable { background: #eef8f2; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .slot.filled.clearable:hover { background: #dff2e6; }
-.slot.locked { background: #fff; color: #a16363; cursor: not-allowed; }
+.slot.locked { background: #fff0f0; color: #a16363; cursor: not-allowed; }
+.slot.blocked-month { background: #fff0f0; }
+.slot.blocked-month:not(.filled) { color: #a16363; }
 .slot:not(:disabled):hover { background: #f0f8f3; }
 .empty { padding: 28px; border: 1px dashed #b8cfdf; border-radius: 18px; color: #65778a; text-align: center; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 18px; background: #0d2b3f80; }
