@@ -24,7 +24,7 @@ test('renders the spreadsheet-style date and horizontal sigla columns', () => {
   assert.match(html, /04 A 10\/01/);
   assert.match(html, /RO/);
   assert.match(html, /disabled/);
-  assert.match(html, /<td class="slot-cell"><button[^>]*><\/button><\/td>/);
+  assert.match(html, /<td class="slot-cell blocked-month"><button[^>]* class="slot locked blocked-month"[^>]*><\/button><\/td>/);
 });
 
 test('API adapter sends reservation as a JSON request', async () => {
