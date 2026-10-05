@@ -1,4 +1,4 @@
-const CACHE = 'ferias2027-static-v1';
+const CACHE = 'ferias2027-static-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './assets/sahmt-logo.svg'];
 
 self.addEventListener('install', event => {

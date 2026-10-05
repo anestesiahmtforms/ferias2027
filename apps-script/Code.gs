@@ -9,6 +9,13 @@ const CONFIG = {
   blockedMonths: ['janeiro', 'julho'],
   maxWeeks: 2,
   maxOverlapDays: 3,
+  halfDayOverlapPairsByWeekday: [
+    [['CH', 'FL']],
+    [['RO', 'AA']],
+    [['DE', 'BA'], ['LC', 'GU']],
+    [['RO', 'AA']],
+    [['L2', 'BA'], ['GB', 'AA']]
+  ],
   rows: {
     janeiro: [5, 6, 7, 8], fevereiro: [5, 6, 7, 8], marco: [13, 14, 15, 16, 17], abril: [13, 14, 15, 16],
     maio: [22, 23, 24, 25], junho: [22, 23, 24, 25, 26], julho: [31, 32, 33, 34], agosto: [31, 32, 33, 34, 35],
@@ -29,6 +36,10 @@ function doGet() {
 function doPost(e) {
   try {
     const request = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (request.action === 'sessionStart') return resposta_(iniciarSessaoMembro_(request));
+    if (request.action === 'sessionSchedule') return resposta_(escalaSessaoMembro_(request));
+    if (request.action === 'sessionEnd') return resposta_(encerrarSessaoMembro_(request));
+    if (request.action === 'cancelOwn') return resposta_(cancelarReservaMembro_(request));
     if (request.action === 'reserve') return resposta_(processarReserva_(request));
     if (request.action === 'admin') return resposta_(processarAdmin_(request));
     return resposta_({ ok: false, codigo: 'ACAO_INVALIDA', mensagem: 'Ação não reconhecida.' });
@@ -47,7 +58,7 @@ function validarReserva_(input) {
   if (Array.isArray(data.weekValues) && data.weekValues.map(normalizar_).includes(sigla)) return { ok: false, codigo: 'SIGLA_REPETIDA' };
   if (data.round === 'individual' && Number(data.slotIndex) !== 0) return { ok: false, codigo: 'RODADA_INICIAL' };
   if (data.round === 'conjunta' && Number(data.slotIndex) === 0) return { ok: false, codigo: 'RODADA_CONJUNTA' };
-  if (data.round === 'conjunta' && Number(data.overlapDays || 0) > CONFIG.maxOverlapDays) return { ok: false, codigo: 'COINCIDENCIA_DIAS' };
+  if (data.round === 'conjunta' && Number(data.overlapDays || 0) > CONFIG.maxOverlapDays) return { ok: false, codigo: 'COINCIDENCIA_DIAS', overlapDays: Number(data.overlapDays) };
   return { ok: true, codigo: 'OK' };
 }
 
@@ -63,6 +74,73 @@ function verificarPin_(pin, expectedHash, salt) {
   return !!pin && hashPin_(pin, salt) === expectedHash;
 }
 
+function chaveSessaoMembro_(token) { return 'MEMBER_SESSION_SIGLA_' + String(token || ''); }
+function chaveEstadoSessaoMembro_(sigla) { return 'MEMBER_SESSION_STATE_' + normalizar_(sigla); }
+function chaveReservaSessao_(vaga) { return 'MEMBER_BOOKING_SESSION_' + String(vaga || ''); }
+
+function validarSessaoMembro_(token) {
+  const value = String(token || '');
+  if (!value) return '';
+  const sigla = propriedade_(chaveSessaoMembro_(value));
+  return sigla && propriedade_(chaveEstadoSessaoMembro_(sigla)) === value ? sigla : '';
+}
+
+function iniciarSessaoMembro_(request) {
+  const sigla = normalizar_(request.sigla);
+  const pinResult = validarPinMembro_(sigla, request.pin);
+  if (!pinResult.ok) return pinResult;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const stateKey = chaveEstadoSessaoMembro_(sigla);
+    const previousState = properties.getProperty(stateKey) || '';
+    if (previousState && previousState !== 'REOPENED') {
+      return { ok: false, codigo: 'SESSAO_BLOQUEADA', mensagem: 'Esta sigla já encerrou a sessão de lançamento. Solicite ao administrador que a reabra.' };
+    }
+
+    const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+    properties.setProperty(chaveSessaoMembro_(token), sigla);
+    properties.setProperty(stateKey, token);
+    if (previousState === 'REOPENED') {
+      const sheet = planilha_().getSheetByName(CONFIG.sheetName);
+      vagas_().forEach(vaga => {
+        if (normalizar_(sheet.getRange(vaga.row, vaga.column).getDisplayValue()) === sigla) {
+          properties.setProperty(chaveReservaSessao_(vaga.id), token);
+        }
+      });
+    }
+    return { ok: true, codigo: 'OK', sigla, sessionToken: token };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function escalaSessaoMembro_(request) {
+  const token = String(request.sessionToken || '');
+  const sigla = validarSessaoMembro_(token);
+  if (!sigla) return { ok: false, codigo: 'SESSAO_ENCERRADA', mensagem: 'A sessão foi encerrada. Solicite ao administrador que reabra o acesso.' };
+  const rules = mapaRegras_(planilha_().getSheetByName(CONFIG.rulesName));
+  return { ok: true, codigo: 'OK', escala: carregarEscala_(token, sigla), siglas: Object.keys(rules) };
+}
+
+function encerrarSessaoMembro_(request) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const token = String(request.sessionToken || '');
+    const sigla = validarSessaoMembro_(token);
+    if (!sigla) return { ok: true, codigo: 'OK' };
+    const properties = PropertiesService.getScriptProperties();
+    properties.setProperty(chaveEstadoSessaoMembro_(sigla), 'CLOSED');
+    properties.deleteProperty(chaveSessaoMembro_(token));
+    auditar_('sessao_encerrada', sigla, '', 'OK', 'Sessão de lançamento encerrada.');
+    return { ok: true, codigo: 'OK', mensagem: 'Sessão encerrada.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function processarReserva_(request) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -72,15 +150,50 @@ function processarReserva_(request) {
     if (!sheet || !vaga) return { ok: false, codigo: 'VAGA_INVALIDA', mensagem: 'Vaga não reconhecida.' };
     const cell = sheet.getRange(vaga.row, vaga.column);
     const currentValue = cell.getDisplayValue();
-    const sigla = normalizar_(request.sigla);
-    const pinResult = validarPinMembro_(sigla, request.pin);
-    if (!pinResult.ok) return pinResult;
+    const sessionToken = String(request.sessionToken || '');
+    const sessionSigla = sessionToken ? validarSessaoMembro_(sessionToken) : '';
+    if (sessionToken && !sessionSigla) return { ok: false, codigo: 'SESSAO_ENCERRADA', mensagem: 'A sessão foi encerrada. Solicite ao administrador que reabra o acesso.' };
+    const sigla = sessionSigla || normalizar_(request.sigla);
+    if (sessionSigla && request.sigla && normalizar_(request.sigla) !== sessionSigla) return { ok: false, codigo: 'SESSAO_SIGLA_DIVERGENTE', mensagem: 'A sessão está vinculada a outra sigla.' };
+    if (!sessionToken) return { ok: false, codigo: 'SESSAO_NECESSARIA', mensagem: 'Inicie uma sessão de lançamento para fazer sua escolha. Atualize a página e tente novamente.' };
     const state = estadoAtual_(sheet, vaga, sigla);
     const result = validarReserva_({ ...request, sigla, month: vaga.month, slotIndex: vaga.slotIndex, currentValue, ...state });
-    if (!result.ok) return mensagemResultado_(result);
+    if (!result.ok) {
+      if (result.codigo === 'COINCIDENCIA_DIAS') {
+        const warning = mensagemResultado_(result);
+        try { auditar_('reserva_rejeitada', sigla, request.vaga, result.codigo, warning.mensagem); } catch (_error) {}
+        return warning;
+      }
+      return mensagemResultado_(result);
+    }
     cell.setValue(sigla);
+    if (sessionToken) PropertiesService.getScriptProperties().setProperty(chaveReservaSessao_(vaga.id), sessionToken);
     auditar_('reserva', sigla, request.vaga, result.codigo);
-    return { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', escala: carregarEscala_() };
+    return { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, escala: carregarEscala_(sessionToken, sessionSigla || '') };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function cancelarReservaMembro_(request) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const token = String(request.sessionToken || '');
+    const sigla = validarSessaoMembro_(token);
+    if (!sigla) return { ok: false, codigo: 'SESSAO_ENCERRADA', mensagem: 'A sessão foi encerrada. Solicite ao administrador que reabra o acesso.' };
+    const vaga = localizarVaga_(request.vaga);
+    if (!vaga) return { ok: false, codigo: 'VAGA_INVALIDA', mensagem: 'Vaga não reconhecida.' };
+    const properties = PropertiesService.getScriptProperties();
+    const sheet = planilha_().getSheetByName(CONFIG.sheetName);
+    const cell = sheet.getRange(vaga.row, vaga.column);
+    if (normalizar_(cell.getDisplayValue()) !== sigla || properties.getProperty(chaveReservaSessao_(vaga.id)) !== token) {
+      return { ok: false, codigo: 'ALTERACAO_NAO_PERMITIDA', mensagem: 'Só é possível limpar uma escolha feita pela sua sigla nesta sessão.' };
+    }
+    cell.clearContent();
+    properties.deleteProperty(chaveReservaSessao_(vaga.id));
+    auditar_('reserva_limpa', sigla, request.vaga, 'OK', 'Escolha removida durante a sessão de lançamento.');
+    return { ok: true, codigo: 'OK', mensagem: 'Sua escolha foi limpa.', escala: carregarEscala_(token, sigla) };
   } finally {
     lock.releaseLock();
   }
@@ -90,9 +203,10 @@ function processarAdmin_(request) {
   if (!verificarPin_(request.pin, propriedade_('ADMIN_PIN_HASH'), propriedade_('PIN_SALT'))) {
     return { ok: false, codigo: 'PIN_INVALIDO', mensagem: 'PIN administrativo inválido.' };
   }
-  if (request.operation === 'schedule') return { ok: true, codigo: 'OK', escala: carregarEscala_(), auditoria: lerAuditoria_() };
+  if (request.operation === 'schedule') return { ok: true, codigo: 'OK', escala: carregarEscala_(), auditoria: lerAuditoria_(), siglas: Object.keys(mapaRegras_(planilha_().getSheetByName(CONFIG.rulesName))) };
   if (request.operation === 'changePin') return trocarPin_(request);
   if (request.operation === 'override') return overrideVaga_(request);
+  if (request.operation === 'reopenMemberSession') return reabrirSessaoMembro_(request);
   return { ok: false, codigo: 'OPERACAO_ADMIN_INVALIDA', mensagem: 'Operação administrativa não reconhecida.' };
 }
 
@@ -107,7 +221,13 @@ function propriedade_(name) { return PropertiesService.getScriptProperties().get
 function planilha_() { return SpreadsheetApp.openById(propriedade_('SPREADSHEET_ID')); }
 function resposta_(payload) { return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON); }
 function normalizar_(value) { return String(value || '').trim().toUpperCase(); }
-function mensagemResultado_(result) { return { ...result, mensagem: mensagens_[result.codigo] || 'A escolha não foi autorizada.' }; }
+function mensagemResultado_(result) {
+  const overlap = Number(result.overlapDays || 0);
+  const mensagem = result.codigo === 'COINCIDENCIA_DIAS'
+    ? `Esta semana coincide em ${formatarDias_(overlap)} com outra sigla; o limite permitido é ${formatarDias_(CONFIG.maxOverlapDays)}.`
+    : (mensagens_[result.codigo] || 'A escolha não foi autorizada.');
+  return { ...result, coincidenciaDias: overlap, mensagem };
+}
 
 const mensagens_ = {
   MES_BLOQUEADO: 'Janeiro e julho estão bloqueados nesta rodada.',
@@ -128,7 +248,7 @@ function localizarVaga_(id) {
   const slotIndex = Number(match[3]);
   const row = CONFIG.rows[month][rowIndex];
   const column = CONFIG.columns[month][slotIndex];
-  return row && column ? { month, row, column, slotIndex } : null;
+  return row && column ? { id: month + '-' + rowIndex + '-' + slotIndex, month, row, column, slotIndex } : null;
 }
 
 function vagas_() {
@@ -157,13 +277,30 @@ function maiorCoincidencia_(weekValues, sigla, regras) {
   const dias = regras[normalizar_(sigla)] || [];
   return weekValues.reduce((max, value) => {
     const outros = regras[normalizar_(value)] || [];
-    const coincidencias = dias.reduce((total, day, index) => total + (day && outros[index] ? 1 : 0), 0);
+    const coincidencias = dias.reduce((total, day, index) => {
+      if (!day || !outros[index]) return total;
+      const paresMeioDia = CONFIG.halfDayOverlapPairsByWeekday[index] || [];
+      const meioDia = paresMeioDia.some(pair =>
+        (pair[0] === normalizar_(sigla) && pair[1] === normalizar_(value)) ||
+        (pair[1] === normalizar_(sigla) && pair[0] === normalizar_(value))
+      );
+      return total + (meioDia ? 0.5 : 1);
+    }, 0);
     return Math.max(max, coincidencias);
   }, 0);
 }
 
-function carregarEscala_() {
+function formatarDias_(value) {
+  const amount = Number(value || 0);
+  const formatted = String(amount).replace('.', ',');
+  return `${formatted} ${amount === 1 || amount < 1 ? 'dia útil' : 'dias úteis'}`;
+}
+
+function carregarEscala_(sessionToken, sessionSigla) {
   const sheet = planilha_().getSheetByName(CONFIG.sheetName);
+  const rules = mapaRegras_(sheet.getParent().getSheetByName(CONFIG.rulesName));
+  const properties = PropertiesService.getScriptProperties();
+  const canUseMemberSession = !!sessionToken && !!sessionSigla && validarSessaoMembro_(sessionToken) === normalizar_(sessionSigla);
   const initialComplete = vagas_().filter(vaga => !CONFIG.blockedMonths.includes(vaga.month) && vaga.slotIndex === 0)
     .every(vaga => normalizar_(sheet.getRange(vaga.row, vaga.column).getDisplayValue()));
   const round = initialComplete ? 'conjunta' : 'individual';
@@ -183,7 +320,12 @@ function carregarEscala_() {
         slots: CONFIG.columns[month].map((column, slotIndex) => {
           const value = sheet.getRange(row, column).getDisplayValue();
           const available = !value && !CONFIG.blockedMonths.includes(month) && (round === 'individual' ? slotIndex === 0 : slotIndex > 0);
-          return { id: month + '-' + rowIndex + '-' + slotIndex, label: 'SIGLA ' + (slotIndex + 1), value, state: value ? 'filled' : (available ? 'available' : 'locked'), disabled: !available };
+          const id = month + '-' + rowIndex + '-' + slotIndex;
+          const canClear = canUseMemberSession && normalizar_(value) === normalizar_(sessionSigla) && properties.getProperty(chaveReservaSessao_(id)) === sessionToken;
+          const otherSiglas = CONFIG.columns[month].map((otherColumn, otherIndex) => otherIndex === slotIndex ? '' : sheet.getRange(row, otherColumn).getDisplayValue())
+            .map(normalizar_).filter(other => other && other !== normalizar_(value));
+          const overlapDays = value ? maiorCoincidencia_(otherSiglas, value, rules) : 0;
+          return { id, label: 'SIGLA ' + (slotIndex + 1), value, overlapDays, canClear, state: value ? 'filled' : (available ? 'available' : 'locked'), disabled: !available && !canClear };
         })
       };
     })
@@ -232,7 +374,8 @@ function overrideVaga_(request) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    const cell = planilha_().getSheetByName(CONFIG.sheetName).getRange(vaga.row, vaga.column);
+    const sheet = planilha_().getSheetByName(CONFIG.sheetName);
+    const cell = sheet.getRange(vaga.row, vaga.column);
     const value = String(request.value == null ? '' : request.value);
     const validation = cell.getDataValidation();
     if (validation) cell.clearDataValidations();
@@ -242,9 +385,35 @@ function overrideVaga_(request) {
     } finally {
       if (validation) cell.setDataValidation(validation);
     }
-    auditar_('admin_override', value, request.vaga, 'OK', request.justification);
+    PropertiesService.getScriptProperties().deleteProperty(chaveReservaSessao_(vaga.id));
+    const rules = mapaRegras_(sheet.getParent().getSheetByName(CONFIG.rulesName));
+    const otherSiglas = CONFIG.columns[vaga.month].map((column, index) => index === vaga.slotIndex ? '' : sheet.getRange(vaga.row, column).getDisplayValue())
+      .map(normalizar_).filter(other => other && other !== normalizar_(value));
+    const overlapDays = value ? maiorCoincidencia_(otherSiglas, value, rules) : 0;
+    const note = overlapDays ? `Coincidência com outra sigla: ${formatarDias_(overlapDays)}. ${String(request.justification).trim()}` : String(request.justification).trim();
+    auditar_('admin_override', value, request.vaga, 'OK', note);
   } finally {
     lock.releaseLock();
   }
   return { ok: true, codigo: 'OK', mensagem: 'Ajuste administrativo aplicado.', escala: carregarEscala_() };
+}
+
+function reabrirSessaoMembro_(request) {
+  const sigla = normalizar_(request.sigla);
+  const sheet = planilha_().getSheetByName(CONFIG.rulesName);
+  const rules = mapaRegras_(sheet);
+  if (!sigla || !rules[sigla]) return { ok: false, codigo: 'SIGLA_INVALIDA', mensagem: 'Selecione uma sigla cadastrada.' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const stateKey = chaveEstadoSessaoMembro_(sigla);
+    const previousState = properties.getProperty(stateKey) || '';
+    if (previousState && previousState !== 'REOPENED') properties.deleteProperty(chaveSessaoMembro_(previousState));
+    properties.setProperty(stateKey, 'REOPENED');
+    auditar_('admin_reabriu_sessao', sigla, '', 'OK', 'Administrador reabriu a sessão de lançamento.');
+    return { ok: true, codigo: 'OK', mensagem: `Sessão de ${sigla} reaberta. O usuário poderá iniciar uma nova sessão com o PIN da sigla.` };
+  } finally {
+    lock.releaseLock();
+  }
 }

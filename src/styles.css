@@ -35,6 +35,8 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .schedule-table .slot-cell { padding: 0; }
 .slot { display: block; width: 100%; min-height: 30px; border: 0; border-radius: 0; background: #fff; color: #16824b; font-size: .72rem; font-weight: 750; cursor: pointer; }
 .slot.filled { background: #fff; color: #16824b; cursor: default; }
+.slot.filled.clearable { background: #eef8f2; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.slot.filled.clearable:hover { background: #dff2e6; }
 .slot.locked { background: #fff; color: #a16363; cursor: not-allowed; }
 .slot:not(:disabled):hover { background: #f0f8f3; }
 .empty { padding: 28px; border: 1px dashed #b8cfdf; border-radius: 18px; color: #65778a; text-align: center; }
@@ -46,6 +48,9 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .booking-modal select, .booking-modal input, .booking-modal textarea { width: 100%; border: 1px solid #c7dbe8; border-radius: 10px; padding: 11px; background: #fbfdff; }
 .modal-close { justify-self: end; border: 0; background: transparent; color: #647c8d; font-size: 1.5rem; cursor: pointer; }
 .admin-override { display: grid; gap: 10px; }
+.admin-reopen { display: grid; gap: 10px; padding: 12px; border: 1px solid #d9e7f2; border-radius: 12px; background: #f7fbfe; }
+.booking-modal [hidden] { display: none; }
+.overlap-warning { padding: 10px 12px; border: 1px solid #e7b75a; border-radius: 10px; background: #fff7df; color: #78520b !important; font-weight: 750; }
 .booking-modal textarea { width: 100%; resize: vertical; border: 1px solid #c7dbe8; border-radius: 10px; padding: 11px; background: #fbfdff; font: inherit; }
 .admin-modal h3 { margin: 4px 0 0; color: #214965; font-size: .9rem; }
 .form-error { min-height: 1.1em; color: #a84e4e !important; }

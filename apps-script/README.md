@@ -1,6 +1,6 @@
 # Serviço Apps Script
 
-Este código deve ser usado no projeto Apps Script ligado à planilha `FÉRIAS-2027` e publicado como Web App.
+`Code.gs` contém o backend do PWA. `SpreadsheetControl.gs` contém o controle acionado por edições na planilha. As duas partes compartilham as regras de semanas, limite de coincidência e exceções de meio dia.
 
 ## Configuração privada
 
@@ -15,10 +15,10 @@ Os PINs em texto claro não devem ser salvos no repositório, na planilha ou nas
 
 ## Publicação
 
-1. Colar `Code.gs` no projeto Apps Script da planilha.
+1. Manter os dois arquivos no projeto Apps Script ligado à planilha `FÉRIAS-2027`.
 2. Configurar as propriedades privadas.
 3. Executar uma vez a rotina administrativa de criação/proteção da aba `AUDITORIA_PWA`, se necessário.
-4. Criar uma implantação como Web App, executando como proprietário e permitindo acesso anônimo.
+4. Criar ou atualizar a implantação como Web App, executando como proprietário e permitindo acesso anônimo.
 5. Colocar somente a URL pública da implantação em `VITE_APPS_SCRIPT_WEB_APP_URL` no GitHub Actions.
 
 O Web App é o único componente autorizado a alterar a escala.

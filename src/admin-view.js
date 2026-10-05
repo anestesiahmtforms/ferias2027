@@ -51,7 +51,10 @@ export function openAdminPanel({ api, onRefresh = () => {} }) {
         (week.slots || []).forEach(slot => {
           const option = document.createElement('option');
           option.value = slot.id;
-          option.textContent = `${week.label || week.id} · ${week.period || ''} · ${slot.label || 'Sigla'}: ${slot.value || 'vazia'}`;
+          const overlapDays = Number(slot.overlapDays || 0);
+          const formattedOverlap = String(overlapDays).replace('.', ',');
+          const overlapNote = overlapDays > 0 ? ` · ${formattedOverlap} ${overlapDays === 1 || overlapDays < 1 ? 'dia coincidente' : 'dias coincidentes'}` : '';
+          option.textContent = `${week.label || week.id} · ${week.period || ''} · ${slot.label || 'Sigla'}: ${slot.value || 'vazia'}${overlapNote}`;
           group.append(option);
           byId.set(slot.id, slot);
         });
@@ -87,6 +90,49 @@ export function openAdminPanel({ api, onRefresh = () => {} }) {
     form.append(slotLabel, valueLabel, justificationLabel, formError, submit);
     content.append(form);
 
+    const reopenForm = document.createElement('form');
+    reopenForm.className = 'admin-reopen';
+    const reopenLabel = document.createElement('label');
+    reopenLabel.textContent = 'Reabrir sessão de lançamento';
+    const reopenSelect = document.createElement('select');
+    reopenSelect.name = 'reopen-sigla';
+    reopenSelect.required = true;
+    reopenSelect.innerHTML = '<option value="">Selecione a sigla</option>';
+    (result.siglas || []).forEach(sigla => {
+      const option = document.createElement('option');
+      option.value = sigla;
+      option.textContent = sigla;
+      reopenSelect.append(option);
+    });
+    reopenLabel.append(reopenSelect);
+    const reopenError = document.createElement('p');
+    reopenError.className = 'form-error';
+    reopenError.setAttribute('aria-live', 'polite');
+    const reopenButton = document.createElement('button');
+    reopenButton.className = 'secondary';
+    reopenButton.type = 'submit';
+    reopenButton.textContent = 'Reabrir acesso';
+    reopenForm.append(reopenLabel, reopenError, reopenButton);
+    content.append(reopenForm);
+
+    reopenForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!reopenSelect.value) { reopenError.textContent = 'Selecione uma sigla.'; return; }
+      if (!window.confirm(`Reabrir a sessão da sigla ${reopenSelect.value}?`)) return;
+      reopenButton.disabled = true;
+      reopenError.textContent = '';
+      try {
+        const reopened = await api.reopenMemberSession(reopenSelect.value, adminPin);
+        if (!reopened.ok) { reopenError.textContent = reopened.mensagem || 'Não foi possível reabrir.'; reopenButton.disabled = false; return; }
+        const refreshed = await api.authenticateAdmin(adminPin);
+        if (refreshed.ok) renderAdminContent(refreshed, reopened.mensagem || 'Acesso reaberto.');
+        else { onRefresh(); renderAdminContent({ escala: result.escala, auditoria: result.auditoria, siglas: result.siglas }, reopened.mensagem || 'Acesso reaberto.'); }
+      } catch (_error) {
+        reopenError.textContent = 'Falha de conexão. Confira o estado antes de tentar novamente.';
+        reopenButton.disabled = false;
+      }
+    });
+
     const auditHeading = document.createElement('h3');
     auditHeading.textContent = 'Auditoria recente';
     content.append(auditHeading);
@@ -97,8 +143,13 @@ export function openAdminPanel({ api, onRefresh = () => {} }) {
       const summary = document.createElement('strong');
       summary.textContent = `${item.sigla || '—'} · ${item.vaga || '—'}`;
       const detail = document.createElement('small');
-      detail.textContent = `${item.timestamp || ''} · ${item.result || ''}`;
+      detail.textContent = `${item.timestamp || ''} · ${item.type || ''} · ${item.result || ''}`;
       row.append(summary, detail);
+      if (item.justification) {
+        const explanation = document.createElement('small');
+        explanation.textContent = item.justification;
+        row.append(explanation);
+      }
       auditList.append(row);
     });
     if (!auditList.children.length) {

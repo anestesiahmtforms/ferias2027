@@ -14,16 +14,21 @@ export function renderApp(root, model = {}) {
       </header>
       <section class="status-card" aria-live="polite">
         <span class="status-dot"></span>
-        <span>${model.status || 'Carregando escala...'}</span>
+        <span>${model.session ? `Sessão ativa para a sigla ${escapeHtml(model.session.sigla)}. Ao encerrar, será necessário o administrador reabrir o acesso.` : (model.status || 'Carregando escala...')}</span>
       </section>
       <section class="toolbar" aria-label="Ações">
         <button class="primary" type="button" data-action="refresh">Atualizar escala</button>
         <button class="secondary" type="button" data-action="admin">Gestão administrativa</button>
+        ${model.session ? '<button class="secondary" type="button" data-action="end-session">Encerrar sessão</button>' : ''}
       </section>
       <section class="schedule-grid" aria-label="Escala de férias">
         ${buildScheduleMarkup(months)}
       </section>
     </main>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 }
 
 export function registerServiceWorker() {
