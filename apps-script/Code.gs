@@ -9,6 +9,7 @@ const CONFIG = {
   blockedMonths: ['janeiro', 'julho'],
   maxWeeks: 2,
   singleWeekSiglas: ['BA', 'FR', 'GB', 'L2', 'LD', 'LC', 'LU', 'MA', 'RA', 'RC', 'RO', 'WE', 'DN', 'AL'],
+  bookingSequence: ['CR', 'AD', 'LH', 'FR', 'DE', 'LE', 'RO', 'AA', 'MA', 'RA', 'LU', 'LC', 'FL', 'L2', 'RL', 'MH', 'RC', 'LD', 'DN', 'WE', 'BA', 'GU', 'JA', 'IG', 'AL', 'GB'],
   maxOverlapDays: 3,
   halfDayOverlapPairsByWeekday: [
     [['CH', 'FL']],
@@ -60,6 +61,15 @@ function validarReserva_(input) {
   if (Array.isArray(data.weekValues) && data.weekValues.map(normalizar_).includes(sigla)) return { ok: false, codigo: 'SIGLA_REPETIDA' };
   if (data.round === 'individual' && Number(data.slotIndex) !== 0) return { ok: false, codigo: 'RODADA_INICIAL' };
   if (data.round === 'conjunta' && Number(data.slotIndex) === 0) return { ok: false, codigo: 'RODADA_CONJUNTA' };
+  if (data.sequenceBlockedBy) {
+    return {
+      ok: false,
+      codigo: 'SEQUENCIA_SIGLAS',
+      sigla,
+      antecedente: data.sequenceBlockedBy,
+      semanasAntecedente: data.weeksForSequenceBlocker
+    };
+  }
   if (data.round === 'conjunta' && Number(data.overlapDays || 0) > CONFIG.maxOverlapDays) return { ok: false, codigo: 'COINCIDENCIA_DIAS', overlapDays: Number(data.overlapDays) };
   return { ok: true, codigo: 'OK' };
 }
@@ -78,6 +88,29 @@ function verificarPin_(pin, expectedHash, salt) {
 
 function limiteSemanas_(sigla) {
   return CONFIG.singleWeekSiglas.includes(normalizar_(sigla)) ? 1 : CONFIG.maxWeeks;
+}
+
+function contarSemanasPorSigla_(sheet) {
+  const counts = {};
+  Object.keys(CONFIG.rows).forEach(month => {
+    const rows = CONFIG.rows[month];
+    const columns = CONFIG.columns[month];
+    sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
+      row.forEach(value => {
+        const sigla = normalizar_(value);
+        if (sigla) counts[sigla] = (counts[sigla] || 0) + 1;
+      });
+    });
+  });
+  return counts;
+}
+
+function antecedentePendenteSequencia_(weeksBySigla, sigla) {
+  const index = CONFIG.bookingSequence.indexOf(normalizar_(sigla));
+  if (index < 0) return '';
+  return CONFIG.bookingSequence.slice(0, index).find(previous =>
+    Number(weeksBySigla[previous] || 0) < limiteSemanas_(previous)
+  ) || '';
 }
 
 function chaveSessaoMembro_(token) { return 'MEMBER_SESSION_SIGLA_' + String(token || ''); }
@@ -233,6 +266,8 @@ function mensagemResultado_(result) {
     ? `Esta semana coincide em ${formatarDias_(overlap)} com outra sigla; o limite permitido é ${formatarDias_(CONFIG.maxOverlapDays)}.`
     : result.codigo === 'LIMITE_SEMANAS'
       ? `Esta sigla já atingiu o limite de ${result.maxWeeks || 1} ${Number(result.maxWeeks || 1) === 1 ? 'semana' : 'semanas'} nesta rodada.`
+      : result.codigo === 'SEQUENCIA_SIGLAS'
+        ? `Aguarde ${result.antecedente} completar a cota de ${result.semanasAntecedente} ${Number(result.semanasAntecedente) === 1 ? 'semana' : 'semanas'} desta rodada antes de liberar ${result.sigla}.`
     : (mensagens_[result.codigo] || 'A escolha não foi autorizada.');
   return { ...result, coincidenciaDias: overlap, mensagem };
 }
@@ -267,9 +302,12 @@ function estadoAtual_(sheet, target, sigla) {
   const initialComplete = initialOpen.every(vaga => normalizar_(sheet.getRange(vaga.row, vaga.column).getDisplayValue()));
   const allowedSiglas = mapaRegras_(sheet.getParent().getSheetByName(CONFIG.rulesName));
   const weekValues = CONFIG.columns[target.month].map(column => sheet.getRange(target.row, column).getDisplayValue()).filter(value => normalizar_(value) !== sigla);
-  const weeksForSigla = vagas_().filter(vaga => normalizar_(sheet.getRange(vaga.row, vaga.column).getDisplayValue()) === sigla).length;
+  const weeksBySigla = contarSemanasPorSigla_(sheet);
+  const weeksForSigla = Number(weeksBySigla[sigla] || 0);
+  const sequenceBlockedBy = antecedentePendenteSequencia_(weeksBySigla, sigla);
+  const weeksForSequenceBlocker = sequenceBlockedBy ? limiteSemanas_(sequenceBlockedBy) : 0;
   const overlapDays = maiorCoincidencia_(weekValues, sigla, allowedSiglas);
-  return { round: initialComplete ? 'conjunta' : 'individual', allowedSiglas, weeksForSigla, weekValues, overlapDays };
+  return { round: initialComplete ? 'conjunta' : 'individual', allowedSiglas, weeksForSigla, weekValues, overlapDays, sequenceBlockedBy, weeksForSequenceBlocker };
 }
 
 function mapaRegras_(sheet) {

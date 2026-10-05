@@ -9,6 +9,7 @@ const CONFIG = {
   descricaoProtecao: 'CONTROLE_FERIAS_2027',
   maxSemanas: 2,
   siglasUmaSemana: ['BA', 'FR', 'GB', 'L2', 'LD', 'LC', 'LU', 'MA', 'RA', 'RC', 'RO', 'WE', 'DN', 'AL'],
+  sequenciaMarcacao: ['CR', 'AD', 'LH', 'FR', 'DE', 'LE', 'RO', 'AA', 'MA', 'RA', 'LU', 'LC', 'FL', 'L2', 'RL', 'MH', 'RC', 'LD', 'DN', 'WE', 'BA', 'GU', 'JA', 'IG', 'AL', 'GB'],
   mesesBloqueados: ['janeiro', 'julho'],
   linhas: {
     janeiro: [5, 6, 7, 8], fevereiro: [5, 6, 7, 8],
@@ -97,6 +98,13 @@ function onEditFerias(e) {
     avisar_(range.getSheet(), sigla + ' já atingiu o limite de ' + limite + (limite === 1 ? ' semana' : ' semanas') + ' nesta rodada.');
     return;
   }
+  const antecedentePendente = antecedentePendenteSequencia_(contarSemanasPorSigla_(range.getSheet()), sigla);
+  if (antecedentePendente) {
+    range.clearContent();
+    const semanasNecessarias = limiteSemanasPorSigla_(antecedentePendente);
+    avisar_(range.getSheet(), 'Aguarde ' + antecedentePendente + ' completar a cota de ' + semanasNecessarias + (semanasNecessarias === 1 ? ' semana' : ' semanas') + ' desta rodada antes de liberar ' + sigla + '.');
+    return;
+  }
   const outrasSiglas = siglasDaSemana_(range.getSheet(), vaga, range.getA1Notation());
   const resultado = validarConjuntoSemana_(outrasSiglas, sigla, regras, deveValidarCoincidencia_(rodada));
   if (!resultado.valido) {
@@ -150,6 +158,29 @@ function limiteSemanasPorSigla_(sigla) {
 
 function atingiuLimiteSemanas_(semanasJaMarcadas, sigla) {
   return semanasJaMarcadas >= limiteSemanasPorSigla_(sigla);
+}
+
+function contarSemanasPorSigla_(aba) {
+  const contagem = {};
+  Object.keys(CONFIG.linhas).forEach(mes => {
+    const linhas = CONFIG.linhas[mes];
+    const colunas = CONFIG.colunas[mes];
+    aba.getRange(linhas[0], colunas[0], linhas.length, colunas.length).getDisplayValues().forEach(linha => {
+      linha.forEach(valor => {
+        const sigla = normalizarSigla_(valor);
+        if (sigla) contagem[sigla] = (contagem[sigla] || 0) + 1;
+      });
+    });
+  });
+  return contagem;
+}
+
+function antecedentePendenteSequencia_(contagem, sigla) {
+  const indice = CONFIG.sequenciaMarcacao.indexOf(normalizarSigla_(sigla));
+  if (indice < 0) return '';
+  return CONFIG.sequenciaMarcacao.slice(0, indice).find(anterior =>
+    Number(contagem[anterior] || 0) < limiteSemanasPorSigla_(anterior)
+  ) || '';
 }
 
 function validarConjuntoSemana_(siglasExistentes, siglaNova, regras, validarCoincidencia = true) {
