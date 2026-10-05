@@ -1,10 +1,11 @@
 :root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #14324b; background: #f4f8fc; font-synthesis: none; }
 * { box-sizing: border-box; }
-html, body { width: 100%; max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
-body { margin: 0; min-width: 320px; }
+html, body { width: 100%; height: 100%; max-width: 100%; overflow: hidden; -webkit-text-size-adjust: 100%; }
+body { margin: 0; min-width: 320px; overscroll-behavior: none; }
+#app { display: grid; place-items: center; width: 100%; height: 100vh; height: 100dvh; min-height: 0; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); overflow: hidden; }
 button { font: inherit; touch-action: manipulation; }
 input, select, textarea { min-width: 0; max-width: 100%; font-size: 16px; }
-.shell { width: 100%; min-width: 0; max-width: 1180px; margin: 0 auto; padding: 18px clamp(14px, 3vw, 32px) 42px; }
+.shell { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: clamp(6px, 1.2vh, 12px); width: 90%; height: 90%; max-width: 1180px; max-height: 100%; min-width: 0; min-height: 0; margin: auto; padding: clamp(10px, 1.8vh, 18px) clamp(12px, 3vw, 32px); overflow: hidden; border: 1px solid #d9e7f2; border-radius: 16px; background: #fff; box-shadow: 0 8px 28px #164b7114; }
 .app-header { display: flex; align-items: center; gap: 14px; padding: 10px 4px 20px; }
 .brand { width: 104px; height: 42px; object-fit: contain; border-radius: 10px; box-shadow: 0 6px 16px #0f4c8124; }
 .eyebrow { margin: 0 0 2px; color: #137a71; font-size: .72rem; font-weight: 800; letter-spacing: .13em; }
@@ -22,7 +23,7 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .app-footer button { width: min(100%, 340px); border: 0; border-radius: 12px; padding: 10px 14px; cursor: pointer; font-weight: 750; }
 .primary { color: #fff; background: #0f4c81; }
 .secondary { color: #0f4c81; background: #dcecf8; }
-.schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: max-content; align-content: start; gap: 16px; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-gutter: stable; }
 .month-card { overflow: hidden; border: 1px solid #cbd8e2; border-radius: 10px; background: #fff; box-shadow: 0 5px 16px #164b7110; }
 .schedule-table-wrap { width: 100%; overflow-x: auto; }
 .schedule-table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }
@@ -65,4 +66,6 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .audit-list { max-height: 260px; overflow: auto; display: grid; gap: 7px; text-align: left; }
 .audit-list div { display: grid; gap: 2px; padding: 8px; border-radius: 9px; background: #f2f7fa; font-size: .78rem; }
 .audit-list small { color: #65778a; }
-@media (max-width: 760px) { .shell { padding-inline: 12px; } .schedule-grid { grid-template-columns: 1fr; gap: 12px; } .schedule-table .month-title div { gap: 6px; flex-wrap: wrap; } .app-header { align-items: flex-start; } .brand { width: 88px; } }
+@media (max-width: 760px) { .shell { width: 94%; height: 92%; padding: 10px clamp(8px, 2.5vw, 14px); gap: clamp(5px, 1vh, 9px); } .schedule-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; } .schedule-table .month-title div { gap: 6px; flex-wrap: wrap; } .app-header { align-items: flex-start; gap: 8px; padding: 2px 0 4px; } .brand { width: 72px; height: 36px; } .subtitle { font-size: .78rem; } .toolbar { padding: 4px 0 6px; } .app-footer { margin-top: 2px; padding-top: 8px; } }
+@media (max-width: 380px) { .shell { width: 96%; padding-inline: 7px; } .app-header { gap: 6px; } .brand { width: 58px; height: 32px; } h1 { font-size: clamp(1.12rem, 5.2vw, 1.35rem); } .status-card { gap: 7px; padding: 8px 10px; font-size: .8rem; } }
+@media (max-height: 700px) { .shell { height: 94%; gap: 5px; padding-block: 6px; } .app-header { padding-block: 0 2px; } .brand { height: 30px; } .subtitle { font-size: .74rem; } .status-card { padding-block: 6px; } .toolbar { padding-block: 2px 4px; } .toolbar button, .app-footer button { padding-block: 7px; } .app-footer { margin-top: 0; padding-top: 6px; } }
