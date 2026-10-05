@@ -13,8 +13,13 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .subtitle { margin: 0; color: #65778a; font-size: .86rem; }
 .status-card { display: flex; align-items: center; gap: 9px; background: #fff; border: 1px solid #d9e7f2; border-radius: 14px; padding: 11px 14px; box-shadow: 0 5px 16px #164b7110; font-size: .87rem; }
 .status-dot { width: 9px; height: 9px; background: #18a67a; border-radius: 50%; box-shadow: 0 0 0 4px #18a67a1f; }
-.toolbar { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 0 18px; }
-.toolbar button { border: 0; border-radius: 12px; padding: 10px 14px; cursor: pointer; font-weight: 750; }
+.toolbar { display: grid; gap: 10px; padding: 14px 0 18px; }
+.toolbar button { width: 100%; border: 0; border-radius: 12px; padding: 10px 14px; cursor: pointer; font-weight: 750; }
+.refresh-button { color: #27384a; background: #ffd34d; box-shadow: 0 3px 9px #9b740b30; font-size: .95rem; }
+.refresh-button:hover { background: #f4c63b; }
+.refresh-button:focus-visible, .app-footer button:focus-visible { outline: 3px solid #0f4c81; outline-offset: 2px; }
+.app-footer { display: flex; justify-content: center; margin-top: 18px; padding: 16px 0 0; border-top: 1px solid #d9e7f2; }
+.app-footer button { width: min(100%, 340px); border: 0; border-radius: 12px; padding: 10px 14px; cursor: pointer; font-weight: 750; }
 .primary { color: #fff; background: #0f4c81; }
 .secondary { color: #0f4c81; background: #dcecf8; }
 .schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
