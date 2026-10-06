@@ -54,7 +54,8 @@ export function openAdminPanel({ api, onRefresh = () => {} }) {
           const overlapDays = Number(slot.overlapDays || 0);
           const formattedOverlap = String(overlapDays).replace('.', ',');
           const overlapNote = overlapDays > 0 ? ` · ${formattedOverlap} ${overlapDays === 1 || overlapDays < 1 ? 'dia coincidente' : 'dias coincidentes'}` : '';
-          option.textContent = `${week.label || week.id} · ${week.period || ''} · ${slot.label || 'Sigla'}: ${slot.value || 'vazia'}${overlapNote}`;
+          const blockedNote = slot.blockedReason ? ` · ${slot.blockedReason}` : '';
+          option.textContent = `${week.label || week.id} · ${week.period || ''} · ${slot.label || 'Sigla'}: ${slot.value || 'vazia'}${overlapNote}${blockedNote}`;
           group.append(option);
           byId.set(slot.id, slot);
         });

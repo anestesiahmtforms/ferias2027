@@ -6,10 +6,14 @@
 const CONFIG = {
   abaFerias: 'FERIAS 2027',
   abaRegras: 'REGRAS',
+  abaAuditoria: 'AUDITORIA_PWA',
   descricaoProtecao: 'CONTROLE_FERIAS_2027',
   maxSemanas: 2,
+  maxDiasCoincidencia: 3,
   siglasUmaSemana: ['BA', 'FR', 'GB', 'L2', 'LD', 'LC', 'LU', 'MA', 'RA', 'RC', 'RO', 'WE', 'DN', 'AL'],
   sequenciaMarcacao: ['CR', 'AD', 'LH', 'FR', 'DE', 'LE', 'RO', 'AA', 'MA', 'RA', 'LU', 'LC', 'FL', 'L2', 'RL', 'MH', 'RC', 'LD', 'DN', 'WE', 'BA', 'GU', 'JA', 'IG', 'AL', 'GB'],
+  siglasForaDaFila: ['CH', 'PR', 'LA', 'LO', 'RU'],
+  chaveInicioFase2: 'PHASE2_SEQUENCE_START_SIGLA',
   mesesBloqueados: ['janeiro', 'julho'],
   linhas: {
     janeiro: [5, 6, 7, 8], fevereiro: [5, 6, 7, 8],
@@ -84,24 +88,32 @@ function onEditFerias(e) {
   // A rodada é calculada como se a célula recém-editada ainda estivesse vazia.
   // Assim, a última SIGLA 1 é aceita e, em seguida, abre a rodada conjunta.
   const rodada = rodadaAtual_(range.getSheet(), range.getA1Notation());
-  if (!vagaPermitidaNaRodada_(vaga, rodada)) {
+  if (!vagaPermitidaNaRodada_(vaga, rodada) || !precedentesPreenchidos_(range.getSheet(), vaga, range.getA1Notation())) {
     range.clearContent();
     avisar_(range.getSheet(), 'Esta vaga ainda não está liberada.');
     return;
   }
 
   const regras = mapaRegras_();
-  const semanasJaMarcadas = contarSemanasDaSigla_(range.getSheet(), sigla, range.getA1Notation());
-  if (atingiuLimiteSemanas_(semanasJaMarcadas, sigla)) {
+  if (vagaSigla3BloqueadaPelaTolerancia_(range.getSheet(), vaga, regras)) {
+    const coincidencia = coincidenciaPrimeirasDuasSiglas_(range.getSheet(), vaga, regras);
+    const dias = String(coincidencia).replace('.', ',');
+    const unidade = coincidencia === 1 || coincidencia < 1 ? 'dia útil' : 'dias úteis';
     range.clearContent();
-    const limite = limiteSemanasPorSigla_(sigla);
+    avisar_(range.getSheet(), 'SIGLA 3 está bloqueada: SIGLA 1 e SIGLA 2 já somam ' + dias + ' ' + unidade + ' coincidentes; o limite é ' + CONFIG.maxDiasCoincidencia + ' dias úteis.');
+    return;
+  }
+  const semanasJaMarcadas = contarSemanasDaSigla_(range.getSheet(), sigla, range.getA1Notation(), rodada);
+  if (atingiuLimiteSemanas_(semanasJaMarcadas, sigla, rodada)) {
+    range.clearContent();
+    const limite = limiteSemanasPorSigla_(sigla, rodada);
     avisar_(range.getSheet(), sigla + ' já atingiu o limite de ' + limite + (limite === 1 ? ' semana' : ' semanas') + ' nesta rodada.');
     return;
   }
-  const antecedentePendente = antecedentePendenteSequencia_(contarSemanasPorSigla_(range.getSheet()), sigla);
+  const antecedentePendente = antecedentePendenteSequencia_(contarSemanasPorSigla_(range.getSheet(), rodada), sigla, rodada, range.getSheet());
   if (antecedentePendente) {
     range.clearContent();
-    const semanasNecessarias = limiteSemanasPorSigla_(antecedentePendente);
+    const semanasNecessarias = limiteSemanasPorSigla_(antecedentePendente, rodada);
     avisar_(range.getSheet(), 'Aguarde ' + antecedentePendente + ' completar a cota de ' + semanasNecessarias + (semanasNecessarias === 1 ? ' semana' : ' semanas') + ' desta rodada antes de liberar ' + sigla + '.');
     return;
   }
@@ -114,17 +126,21 @@ function onEditFerias(e) {
   }
 
   range.setValue(sigla);
+  if (rodada === 'individual' && vaga.indiceSigla === 0 && rodadaAtual_(range.getSheet()) === 'conjunta') {
+    definirInicioFase2_(range.getSheet(), sigla);
+  }
   atualizarControleFerias();
   avisar_(range.getSheet(), 'Escolha confirmada: ' + sigla + '.');
 }
 
 function obterVagasLiberadas_(aba) {
   const rodada = rodadaAtual_(aba);
+  const regras = mapaRegras_();
   const liberadas = [];
   todasVagas_().forEach(vaga => {
     const range = aba.getRange(vaga.linha, vaga.coluna);
     if (range.getDisplayValue().trim()) return;
-    if (vagaPermitidaNaRodada_(vaga, rodada)) liberadas.push(range);
+    if (vagaPermitidaNaRodada_(vaga, rodada) && precedentesPreenchidos_(aba, vaga) && !vagaSigla3BloqueadaPelaTolerancia_(aba, vaga, regras)) liberadas.push(range);
   });
   return liberadas;
 }
@@ -152,21 +168,44 @@ function deveValidarCoincidencia_(rodada) {
   return rodada === 'conjunta';
 }
 
-function limiteSemanasPorSigla_(sigla) {
+function precedentesPreenchidos_(aba, vaga, a1Ignorado = '') {
+  if (vaga.indiceSigla === 0) return true;
+  const primeira = aba.getRange(vaga.linha, CONFIG.colunas[vaga.mes][0]);
+  if (primeira.getA1Notation() === a1Ignorado || !normalizarSigla_(primeira.getDisplayValue())) return false;
+  if (vaga.indiceSigla === 1) return true;
+  const segunda = aba.getRange(vaga.linha, CONFIG.colunas[vaga.mes][1]);
+  return segunda.getA1Notation() !== a1Ignorado && !!normalizarSigla_(segunda.getDisplayValue());
+}
+
+function coincidenciaPrimeirasDuasSiglas_(aba, vaga, regras) {
+  if (vaga.indiceSigla !== 2) return 0;
+  const siglas = CONFIG.colunas[vaga.mes].slice(0, 2)
+    .map(coluna => normalizarSigla_(aba.getRange(vaga.linha, coluna).getDisplayValue()));
+  if (!siglas[0] || !siglas[1]) return 0;
+  return contarCoincidenciaTotal_(siglas, regras);
+}
+
+function vagaSigla3BloqueadaPelaTolerancia_(aba, vaga, regras) {
+  return vaga.indiceSigla === 2 && coincidenciaPrimeirasDuasSiglas_(aba, vaga, regras) >= CONFIG.maxDiasCoincidencia;
+}
+
+function limiteSemanasPorSigla_(sigla, rodada) {
+  if (rodada === 'conjunta') return CONFIG.maxSemanas;
   return CONFIG.siglasUmaSemana.includes(normalizarSigla_(sigla)) ? 1 : CONFIG.maxSemanas;
 }
 
-function atingiuLimiteSemanas_(semanasJaMarcadas, sigla) {
-  return semanasJaMarcadas >= limiteSemanasPorSigla_(sigla);
+function atingiuLimiteSemanas_(semanasJaMarcadas, sigla, rodada) {
+  return semanasJaMarcadas >= limiteSemanasPorSigla_(sigla, rodada);
 }
 
-function contarSemanasPorSigla_(aba) {
+function contarSemanasPorSigla_(aba, rodada) {
   const contagem = {};
   Object.keys(CONFIG.linhas).filter(mes => !mesBloqueado_(mes)).forEach(mes => {
     const linhas = CONFIG.linhas[mes];
     const colunas = CONFIG.colunas[mes];
     aba.getRange(linhas[0], colunas[0], linhas.length, colunas.length).getDisplayValues().forEach(linha => {
-      linha.forEach(valor => {
+      linha.forEach((valor, indiceSigla) => {
+        if (rodada === 'conjunta' ? indiceSigla === 0 : indiceSigla > 0) return;
         const sigla = normalizarSigla_(valor);
         if (sigla) contagem[sigla] = (contagem[sigla] || 0) + 1;
       });
@@ -175,11 +214,56 @@ function contarSemanasPorSigla_(aba) {
   return contagem;
 }
 
-function antecedentePendenteSequencia_(contagem, sigla) {
-  const indice = CONFIG.sequenciaMarcacao.indexOf(normalizarSigla_(sigla));
+function ordemSequencia_(aba, rodada) {
+  const sequencia = CONFIG.sequenciaMarcacao.slice();
+  if (rodada !== 'conjunta') return sequencia;
+  const contagemInicial = contarSemanasPorSigla_(aba, 'individual');
+  const inicioPadrao = sequencia.find(item => Number(contagemInicial[item] || 0) < limiteSemanasPorSigla_(item, 'individual')) || sequencia[0];
+  const inicio = inicioFase2Compartilhado_(aba) || PropertiesService.getScriptProperties().getProperty(CONFIG.chaveInicioFase2) || inicioPadrao;
+  const indiceInicio = sequencia.indexOf(normalizarSigla_(inicio));
+  return indiceInicio > 0 ? sequencia.slice(indiceInicio).concat(sequencia.slice(0, indiceInicio)) : sequencia;
+}
+
+function inicioFase2Compartilhado_(aba) {
+  const auditoria = aba.getParent().getSheetByName(CONFIG.abaAuditoria);
+  if (!auditoria || auditoria.getLastRow() < 2) return '';
+  const registros = auditoria.getRange(2, 2, auditoria.getLastRow() - 1, 2).getDisplayValues();
+  for (let indice = registros.length - 1; indice >= 0; indice -= 1) {
+    if (normalizarSigla_(registros[indice][0]) === 'FASE2_INICIO') return normalizarSigla_(registros[indice][1]);
+  }
+  return '';
+}
+
+function definirInicioFase2_(aba, siglaFinal) {
+  const indiceAtual = CONFIG.sequenciaMarcacao.indexOf(normalizarSigla_(siglaFinal));
+  let proxima = indiceAtual >= 0 ? CONFIG.sequenciaMarcacao[(indiceAtual + 1) % CONFIG.sequenciaMarcacao.length] : '';
+  if (!proxima) {
+    const contagemInicial = contarSemanasPorSigla_(aba, 'individual');
+    proxima = CONFIG.sequenciaMarcacao.find(sigla => Number(contagemInicial[sigla] || 0) < limiteSemanasPorSigla_(sigla, 'individual')) || CONFIG.sequenciaMarcacao[0];
+  }
+  PropertiesService.getScriptProperties().setProperty(CONFIG.chaveInicioFase2, proxima);
+  registrarInicioFase2Auditoria_(aba.getParent(), proxima, siglaFinal);
+  return proxima;
+}
+
+function registrarInicioFase2Auditoria_(planilha, proxima, siglaFinal) {
+  let auditoria = planilha.getSheetByName(CONFIG.abaAuditoria);
+  if (!auditoria) {
+    auditoria = planilha.insertSheet(CONFIG.abaAuditoria);
+    auditoria.appendRow(['Data/hora', 'Tipo', 'Sigla', 'Vaga', 'Resultado', 'Justificativa']);
+    const protecao = auditoria.protect().setDescription('AUDITORIA_PWA_PROTEGIDA');
+    protecao.getEditors().forEach(editor => protecao.removeEditor(editor));
+    if (protecao.canDomainEdit()) protecao.setDomainEdit(false);
+  }
+  auditoria.appendRow([new Date(), 'fase2_inicio', proxima, '', 'OK', 'Fase 2 iniciada após o fechamento de SIGLA 1 por ' + (normalizarSigla_(siglaFinal) || 'edição administrativa') + '.']);
+}
+
+function antecedentePendenteSequencia_(contagem, sigla, rodada, aba) {
+  const sequencia = ordemSequencia_(aba, rodada);
+  const indice = sequencia.indexOf(normalizarSigla_(sigla));
   if (indice < 0) return '';
-  return CONFIG.sequenciaMarcacao.slice(0, indice).find(anterior =>
-    Number(contagem[anterior] || 0) < limiteSemanasPorSigla_(anterior)
+  return sequencia.slice(0, indice).find(anterior =>
+    Number(contagem[anterior] || 0) < limiteSemanasPorSigla_(anterior, rodada)
   ) || '';
 }
 
@@ -189,15 +273,26 @@ function validarConjuntoSemana_(siglasExistentes, siglaNova, regras, validarCoin
   const existentes = siglasExistentes.map(normalizarSigla_).filter(Boolean);
   if (existentes.includes(nova)) return { valido: false, mensagem: 'A sigla ' + nova + ' já está nesta semana.' };
   if (!validarCoincidencia) return { valido: true, mensagem: '' };
-  for (const existente of existentes) {
-    const coincidencia = contarDiasCoincidentes_(regras[existente], regras[nova], existente, nova);
-    if (coincidencia > 3) {
-      const dias = String(coincidencia).replace('.', ',');
-      const unidade = coincidencia === 1 || coincidencia < 1 ? 'dia útil' : 'dias úteis';
-      return { valido: false, mensagem: existente + ' e ' + nova + ' coincidem em ' + dias + ' ' + unidade + '; o limite é 3 dias úteis.' };
-    }
+  const coincidencia = contarCoincidenciaTotal_([...existentes, nova], regras);
+  if (coincidencia > CONFIG.maxDiasCoincidencia) {
+    const dias = String(coincidencia).replace('.', ',');
+    const unidade = coincidencia === 1 || coincidencia < 1 ? 'dia útil' : 'dias úteis';
+    return { valido: false, mensagem: 'A soma das coincidências desta semana seria de ' + dias + ' ' + unidade + '; o limite é ' + CONFIG.maxDiasCoincidencia + ' dias úteis.' };
   }
   return { valido: true, mensagem: '' };
+}
+
+function contarCoincidenciaTotal_(siglas, regras) {
+  const participantes = siglas.map(normalizarSigla_).filter(Boolean);
+  let total = 0;
+  for (let esquerda = 0; esquerda < participantes.length; esquerda += 1) {
+    for (let direita = esquerda + 1; direita < participantes.length; direita += 1) {
+      const siglaA = participantes[esquerda];
+      const siglaB = participantes[direita];
+      total += contarDiasCoincidentes_(regras[siglaA] || [], regras[siglaB] || [], siglaA, siglaB);
+    }
+  }
+  return total;
 }
 
 function contarDiasCoincidentes_(diasA, diasB, siglaA, siglaB) {
@@ -255,10 +350,11 @@ function siglasDaSemana_(aba, vaga, a1Excluido) {
     .filter(Boolean);
 }
 
-function contarSemanasDaSigla_(aba, sigla, a1Excluido = '') {
+function contarSemanasDaSigla_(aba, sigla, a1Excluido = '', rodada) {
   const procurada = normalizarSigla_(sigla);
   return todasVagas_().reduce((total, vaga) => {
     if (mesBloqueado_(vaga.mes)) return total;
+    if (rodada === 'conjunta' ? vaga.indiceSigla === 0 : vaga.indiceSigla > 0) return total;
     const range = aba.getRange(vaga.linha, vaga.coluna);
     if (range.getA1Notation() === a1Excluido) return total;
     return total + (normalizarSigla_(range.getDisplayValue()) === procurada ? 1 : 0);

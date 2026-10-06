@@ -3,6 +3,7 @@ import { renderApp, registerServiceWorker } from './app.js';
 import { createApi } from './api.js';
 import { openBookingModal } from './booking-modal.js';
 import { openAdminPanel } from './admin-view.js';
+import { WHATSAPP_CONTACTS, WHATSAPP_INVITE_TEXT } from './whatsapp-contacts.js';
 
 const root = document.querySelector('#app');
 const endpoint = import.meta.env.VITE_APPS_SCRIPT_WEB_APP_URL || '';
@@ -10,6 +11,7 @@ const api = createApi(endpoint);
 let activeSession = null;
 let currentSchedule = null;
 let currentSiglas = [];
+let whatsappInviteFallback = null;
 
 function renderCurrentSchedule(status = 'Escala atualizada.') {
   renderApp(root, {
@@ -17,7 +19,47 @@ function renderCurrentSchedule(status = 'Escala atualizada.') {
     months: currentSchedule?.escala || [],
     session: activeSession
   });
+  renderWhatsAppInviteFallback();
   wireInteractions(currentSiglas);
+}
+
+function openWhatsAppInvite(sigla) {
+  const nextSigla = String(sigla || '').trim().toUpperCase();
+  const phone = WHATSAPP_CONTACTS[nextSigla];
+  if (!phone) return;
+
+  const appUrl = new URL(import.meta.env.BASE_URL || './', window.location.href).href;
+  const destination = new URL(`https://wa.me/${phone}`);
+  destination.searchParams.set('text', `${WHATSAPP_INVITE_TEXT}\n${appUrl}`);
+  whatsappInviteFallback = { sigla: nextSigla, url: destination.href };
+
+  let popup = null;
+  try { popup = window.open(destination.href, '_blank'); } catch (_error) {}
+  if (popup) {
+    whatsappInviteFallback = null;
+    try { popup.opener = null; } catch (_error) {}
+    return;
+  }
+  renderWhatsAppInviteFallback();
+}
+
+function renderWhatsAppInviteFallback() {
+  const status = root.querySelector('.status-card');
+  if (!status) return;
+  status.querySelector('.whatsapp-invite')?.remove();
+  if (!whatsappInviteFallback) return;
+
+  const notice = document.createElement('span');
+  notice.className = 'whatsapp-invite';
+  notice.setAttribute('role', 'status');
+  notice.append(document.createTextNode(`A próxima sigla da fila é ${whatsappInviteFallback.sigla}. O WhatsApp não abriu automaticamente. `));
+  const link = document.createElement('a');
+  link.href = whatsappInviteFallback.url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = 'Abrir o convite para revisar e enviar';
+  notice.append(link);
+  status.append(notice);
 }
 
 function applyScheduleResponse(response, status = 'Escala atualizada.') {
@@ -70,6 +112,10 @@ function wireInteractions(siglas) {
     await boot();
   });
   root.querySelectorAll('[data-slot]').forEach(button => {
+    if (button.dataset.blockedReason) {
+      button.addEventListener('click', () => window.alert(button.dataset.blockedReason));
+      return;
+    }
     if (button.disabled) return;
     button.addEventListener('click', async () => {
       if (button.dataset.clearOwn === 'true') {
@@ -96,6 +142,7 @@ function wireInteractions(siglas) {
         onDone: result => {
           if (!applyScheduleResponse(result)) void boot();
         },
+        onInvite: result => openWhatsAppInvite(result.proximaSiglaConvite),
         onFailure: () => { void boot(); }
       });
     });

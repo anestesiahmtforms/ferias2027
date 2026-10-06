@@ -24,7 +24,7 @@ function renderMonth(month) {
         <tbody>${(month.weeks || []).map(week => `<tr>
           <th class="week-label" scope="row">${escapeHtml(week.label)}</th>
           <td class="week-period">${escapeHtml(week.period)}</td>
-          ${(week.slots || []).map(slot => `<td class="slot-cell${blockedMonthClass}"><button class="slot ${escapeHtml(slot.state || 'available')}${slot.canClear ? ' clearable' : ''}${blockedMonthClass}" type="button" aria-label="${escapeHtml(`${slot.label || 'Sigla'} ${slot.value ? slot.value : 'vaga vazia'}, ${week.label}, ${week.period}${slot.canClear ? ', toque para limpar sua escolha' : ''}`)}" ${slot.disabled ? 'disabled' : ''} data-clear-own="${slot.canClear ? 'true' : 'false'}" data-slot="${escapeHtml(slot.id)}">${escapeHtml(slot.value || '')}</button></td>`).join('')}
+          ${(week.slots || []).map(slot => `<td class="slot-cell${blockedMonthClass}"><button class="slot ${escapeHtml(slot.state || 'available')}${slot.canClear ? ' clearable' : ''}${blockedMonthClass}" type="button" aria-label="${escapeHtml(`${slot.label || 'Sigla'} ${slot.value ? slot.value : 'vaga vazia'}, ${week.label}, ${week.period}${slot.canClear ? ', toque para limpar sua escolha' : ''}${slot.blockedReason ? `, ${slot.blockedReason}` : ''}`)}" title="${escapeHtml(slot.blockedReason || '')}" ${slot.disabled ? 'disabled' : ''} data-blocked-reason="${escapeHtml(slot.blockedReason || '')}" data-clear-own="${slot.canClear ? 'true' : 'false'}" data-slot="${escapeHtml(slot.id)}">${escapeHtml(slot.value || '')}</button></td>`).join('')}
         </tr>`).join('')}</tbody>
       </table>
     </div>

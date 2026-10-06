@@ -10,6 +10,7 @@ const CONFIG = {
   maxWeeks: 2,
   singleWeekSiglas: ['BA', 'FR', 'GB', 'L2', 'LD', 'LC', 'LU', 'MA', 'RA', 'RC', 'RO', 'WE', 'DN', 'AL'],
   bookingSequence: ['CR', 'AD', 'LH', 'FR', 'DE', 'LE', 'RO', 'AA', 'MA', 'RA', 'LU', 'LC', 'FL', 'L2', 'RL', 'MH', 'RC', 'LD', 'DN', 'WE', 'BA', 'GU', 'JA', 'IG', 'AL', 'GB'],
+  phase2SequenceStartProperty: 'PHASE2_SEQUENCE_START_SIGLA',
   maxOverlapDays: 3,
   halfDayOverlapPairsByWeekday: [
     [['CH', 'FL']],
@@ -56,11 +57,12 @@ function validarReserva_(input) {
   if (!data.allowedSiglas || !data.allowedSiglas[sigla]) return { ok: false, codigo: 'SIGLA_INVALIDA' };
   if (CONFIG.blockedMonths.includes(String(data.month || '').trim().toLowerCase())) return { ok: false, codigo: 'MES_BLOQUEADO' };
   if (normalizar_(data.currentValue)) return { ok: false, codigo: 'VAGA_OCUPADA' };
-  const maxWeeks = limiteSemanas_(sigla);
+  const maxWeeks = limiteSemanas_(sigla, data.round);
   if (Number(data.weeksForSigla || 0) >= maxWeeks) return { ok: false, codigo: 'LIMITE_SEMANAS', maxWeeks };
   if (Array.isArray(data.weekValues) && data.weekValues.map(normalizar_).includes(sigla)) return { ok: false, codigo: 'SIGLA_REPETIDA' };
   if (data.round === 'individual' && Number(data.slotIndex) !== 0) return { ok: false, codigo: 'RODADA_INICIAL' };
   if (data.round === 'conjunta' && Number(data.slotIndex) === 0) return { ok: false, codigo: 'RODADA_CONJUNTA' };
+  if (data.round === 'conjunta' && data.slotPrerequisitesMet === false) return { ok: false, codigo: 'VAGA_ANTECEDENTE' };
   if (data.sequenceBlockedBy) {
     return {
       ok: false,
@@ -69,6 +71,9 @@ function validarReserva_(input) {
       antecedente: data.sequenceBlockedBy,
       semanasAntecedente: data.weeksForSequenceBlocker
     };
+  }
+  if (data.round === 'conjunta' && Number(data.slotIndex) === 2 && Number(data.existingFirstTwoOverlapDays || 0) >= CONFIG.maxOverlapDays) {
+    return { ok: false, codigo: 'SIGLA3_BLOQUEADA_TOLERANCIA', overlapDays: Number(data.existingFirstTwoOverlapDays) };
   }
   if (data.round === 'conjunta' && Number(data.overlapDays || 0) > CONFIG.maxOverlapDays) return { ok: false, codigo: 'COINCIDENCIA_DIAS', overlapDays: Number(data.overlapDays) };
   return { ok: true, codigo: 'OK' };
@@ -86,17 +91,19 @@ function verificarPin_(pin, expectedHash, salt) {
   return !!pin && hashPin_(pin, salt) === expectedHash;
 }
 
-function limiteSemanas_(sigla) {
+function limiteSemanas_(sigla, round) {
+  if (round === 'conjunta') return CONFIG.maxWeeks;
   return CONFIG.singleWeekSiglas.includes(normalizar_(sigla)) ? 1 : CONFIG.maxWeeks;
 }
 
-function contarSemanasPorSigla_(sheet) {
+function contarSemanasPorSigla_(sheet, round) {
   const counts = {};
   Object.keys(CONFIG.rows).filter(month => !CONFIG.blockedMonths.includes(month)).forEach(month => {
     const rows = CONFIG.rows[month];
     const columns = CONFIG.columns[month];
     sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
-      row.forEach(value => {
+      row.forEach((value, slotIndex) => {
+        if (round === 'conjunta' ? slotIndex === 0 : slotIndex > 0) return;
         const sigla = normalizar_(value);
         if (sigla) counts[sigla] = (counts[sigla] || 0) + 1;
       });
@@ -105,12 +112,62 @@ function contarSemanasPorSigla_(sheet) {
   return counts;
 }
 
-function antecedentePendenteSequencia_(weeksBySigla, sigla) {
-  const index = CONFIG.bookingSequence.indexOf(normalizar_(sigla));
+function ordemSequencia_(sheet, round) {
+  const sequence = CONFIG.bookingSequence.slice();
+  if (round !== 'conjunta') return sequence;
+  const initialCounts = contarSemanasPorSigla_(sheet, 'individual');
+  const fallbackStart = sequence.find(item => Number(initialCounts[item] || 0) < limiteSemanas_(item, 'individual')) || sequence[0];
+  const start = inicioFase2Compartilhado_(sheet) || propriedade_(CONFIG.phase2SequenceStartProperty) || fallbackStart;
+  const index = sequence.indexOf(normalizar_(start));
+  return index > 0 ? sequence.slice(index).concat(sequence.slice(0, index)) : sequence;
+}
+
+function inicioFase2Compartilhado_(sheet) {
+  const audit = sheet.getParent().getSheetByName(CONFIG.auditName);
+  if (!audit || audit.getLastRow() < 2) return '';
+  const entries = audit.getRange(2, 2, audit.getLastRow() - 1, 2).getDisplayValues();
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (normalizar_(entries[index][0]) === 'FASE2_INICIO') return normalizar_(entries[index][1]);
+  }
+  return '';
+}
+
+function antecedentePendenteSequencia_(sheet, weeksBySigla, sigla, round) {
+  const sequence = ordemSequencia_(sheet, round);
+  const index = sequence.indexOf(normalizar_(sigla));
   if (index < 0) return '';
-  return CONFIG.bookingSequence.slice(0, index).find(previous =>
-    Number(weeksBySigla[previous] || 0) < limiteSemanas_(previous)
+  return sequence.slice(0, index).find(previous =>
+    Number(weeksBySigla[previous] || 0) < limiteSemanas_(previous, round)
   ) || '';
+}
+
+function primeiraPendenteSequencia_(sheet, counts, round) {
+  return ordemSequencia_(sheet, round).find(sigla =>
+    Number(counts[sigla] || 0) < limiteSemanas_(sigla, round)
+  ) || '';
+}
+
+function obterProximaSiglaConvite_(sheet, siglaAtual, round, counts) {
+  const sequence = ordemSequencia_(sheet, round);
+  const index = sequence.indexOf(normalizar_(siglaAtual));
+  if (index < 0) return '';
+  return sequence.slice(index + 1).find(sigla =>
+    Number(counts[sigla] || 0) < limiteSemanas_(sigla, round)
+  ) || '';
+}
+
+function definirInicioFase2_(sheet, siglaFinal) {
+  const currentIndex = CONFIG.bookingSequence.indexOf(normalizar_(siglaFinal));
+  let next = currentIndex >= 0
+    ? CONFIG.bookingSequence[(currentIndex + 1) % CONFIG.bookingSequence.length]
+    : '';
+  if (!next) {
+    const initialCounts = contarSemanasPorSigla_(sheet, 'individual');
+    next = CONFIG.bookingSequence.find(sigla => Number(initialCounts[sigla] || 0) < limiteSemanas_(sigla, 'individual')) || CONFIG.bookingSequence[0];
+  }
+  PropertiesService.getScriptProperties().setProperty(CONFIG.phase2SequenceStartProperty, next);
+  auditar_('fase2_inicio', next, '', 'OK', 'Fase 2 iniciada após o fechamento de SIGLA 1 por ' + (normalizar_(siglaFinal) || 'edição administrativa') + '.');
+  return next;
 }
 
 function chaveSessaoMembro_(token) { return 'MEMBER_SESSION_SIGLA_' + String(token || ''); }
@@ -206,9 +263,22 @@ function processarReserva_(request) {
       return mensagemResultado_(result);
     }
     cell.setValue(sigla);
-    if (sessionToken) PropertiesService.getScriptProperties().setProperty(chaveReservaSessao_(vaga.id), sessionToken);
+    const properties = PropertiesService.getScriptProperties();
+    if (sessionToken) properties.setProperty(chaveReservaSessao_(vaga.id), sessionToken);
     auditar_('reserva', sigla, request.vaga, result.codigo);
-    return { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, escala: carregarEscala_(sessionToken, sessionSigla || '') };
+    const roundAfter = faseAtual_(sheet);
+    let nextInvite = '';
+    if (state.round === 'individual' && roundAfter === 'conjunta') {
+      nextInvite = definirInicioFase2_(sheet, sigla);
+    } else {
+      const countsAfter = contarSemanasPorSigla_(sheet, state.round);
+      if (Number(countsAfter[sigla] || 0) >= limiteSemanas_(sigla, state.round)) {
+        nextInvite = obterProximaSiglaConvite_(sheet, sigla, state.round, countsAfter);
+      }
+    }
+    const response = { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, escala: carregarEscala_(sessionToken, sessionSigla || '') };
+    if (nextInvite) response.proximaSiglaConvite = nextInvite;
+    return response;
   } finally {
     lock.releaseLock();
   }
@@ -231,6 +301,7 @@ function cancelarReservaMembro_(request) {
     }
     cell.clearContent();
     properties.deleteProperty(chaveReservaSessao_(vaga.id));
+    if (faseAtual_(sheet) === 'individual') properties.deleteProperty(CONFIG.phase2SequenceStartProperty);
     auditar_('reserva_limpa', sigla, request.vaga, 'OK', 'Escolha removida durante a sessão de lançamento.');
     return { ok: true, codigo: 'OK', mensagem: 'Sua escolha foi limpa.', escala: carregarEscala_(token, sigla) };
   } finally {
@@ -263,7 +334,9 @@ function normalizar_(value) { return String(value || '').trim().toUpperCase(); }
 function mensagemResultado_(result) {
   const overlap = Number(result.overlapDays || 0);
   const mensagem = result.codigo === 'COINCIDENCIA_DIAS'
-    ? `Esta semana coincide em ${formatarDias_(overlap)} com outra sigla; o limite permitido é ${formatarDias_(CONFIG.maxOverlapDays)}.`
+    ? `A soma das coincidências desta semana seria de ${formatarDias_(overlap)}; o limite é ${formatarDias_(CONFIG.maxOverlapDays)}.`
+    : result.codigo === 'SIGLA3_BLOQUEADA_TOLERANCIA'
+      ? `SIGLA 3 está bloqueada: SIGLA 1 e SIGLA 2 já coincidem em ${formatarDias_(overlap)}; a tolerância termina em ${formatarDias_(CONFIG.maxOverlapDays)}.`
     : result.codigo === 'LIMITE_SEMANAS'
       ? `Esta sigla já atingiu o limite de ${result.maxWeeks || 1} ${Number(result.maxWeeks || 1) === 1 ? 'semana' : 'semanas'} nesta rodada.`
       : result.codigo === 'SEQUENCIA_SIGLAS'
@@ -277,7 +350,9 @@ const mensagens_ = {
   VAGA_OCUPADA: 'Esta vaga já foi preenchida.',
   RODADA_INICIAL: 'As férias conjuntas ainda não estão liberadas.',
   RODADA_CONJUNTA: 'A vaga inicial desta semana ainda deve ser preenchida.',
+  VAGA_ANTECEDENTE: 'Preencha as vagas anteriores desta semana antes de escolher esta sigla.',
   COINCIDENCIA_DIAS: 'A combinação ultrapassa três dias úteis coincidentes.',
+  SIGLA3_BLOQUEADA_TOLERANCIA: 'SIGLA 3 está bloqueada: SIGLA 1 e SIGLA 2 já atingiram o limite de três dias úteis coincidentes.',
   SIGLA_REPETIDA: 'A sigla já está registrada nesta semana.',
   SIGLA_INVALIDA: 'A sigla não está cadastrada nas regras.'
 };
@@ -297,17 +372,27 @@ function vagas_() {
   return Object.keys(CONFIG.rows).flatMap(month => CONFIG.rows[month].flatMap((row, rowIndex) => CONFIG.columns[month].map((column, slotIndex) => ({ id: month + '-' + rowIndex + '-' + slotIndex, month, row, column, slotIndex }))));
 }
 
+function faseAtual_(sheet) {
+  const initialSlots = vagas_().filter(vaga => !CONFIG.blockedMonths.includes(vaga.month) && vaga.slotIndex === 0);
+  return initialSlots.every(vaga => normalizar_(sheet.getRange(vaga.row, vaga.column).getDisplayValue())) ? 'conjunta' : 'individual';
+}
+
 function estadoAtual_(sheet, target, sigla) {
-  const initialOpen = vagas_().filter(vaga => !CONFIG.blockedMonths.includes(vaga.month) && vaga.slotIndex === 0);
-  const initialComplete = initialOpen.every(vaga => normalizar_(sheet.getRange(vaga.row, vaga.column).getDisplayValue()));
+  const round = faseAtual_(sheet);
   const allowedSiglas = mapaRegras_(sheet.getParent().getSheetByName(CONFIG.rulesName));
-  const weekValues = CONFIG.columns[target.month].map(column => sheet.getRange(target.row, column).getDisplayValue()).filter(value => normalizar_(value) !== sigla);
-  const weeksBySigla = contarSemanasPorSigla_(sheet);
+  const weekValues = CONFIG.columns[target.month].map(column => normalizar_(sheet.getRange(target.row, column).getDisplayValue()));
+  const firstSlotFilled = !!weekValues[0];
+  const secondSlotFilled = !!weekValues[1];
+  const slotPrerequisitesMet = target.slotIndex === 1 ? firstSlotFilled : target.slotIndex === 2 ? firstSlotFilled && secondSlotFilled : true;
+  const existingFirstTwoOverlapDays = firstSlotFilled && secondSlotFilled
+    ? somarCoincidenciasPorPar_(weekValues.slice(0, 2), '', allowedSiglas)
+    : 0;
+  const weeksBySigla = contarSemanasPorSigla_(sheet, round);
   const weeksForSigla = Number(weeksBySigla[sigla] || 0);
-  const sequenceBlockedBy = antecedentePendenteSequencia_(weeksBySigla, sigla);
-  const weeksForSequenceBlocker = sequenceBlockedBy ? limiteSemanas_(sequenceBlockedBy) : 0;
-  const overlapDays = maiorCoincidencia_(weekValues, sigla, allowedSiglas);
-  return { round: initialComplete ? 'conjunta' : 'individual', allowedSiglas, weeksForSigla, weekValues, overlapDays, sequenceBlockedBy, weeksForSequenceBlocker };
+  const sequenceBlockedBy = antecedentePendenteSequencia_(sheet, weeksBySigla, sigla, round);
+  const weeksForSequenceBlocker = sequenceBlockedBy ? limiteSemanas_(sequenceBlockedBy, round) : 0;
+  const overlapDays = somarCoincidenciasPorPar_(weekValues, sigla, allowedSiglas);
+  return { round, allowedSiglas, weeksForSigla, weekValues, overlapDays, sequenceBlockedBy, weeksForSequenceBlocker, slotPrerequisitesMet, existingFirstTwoOverlapDays };
 }
 
 function mapaRegras_(sheet) {
@@ -318,20 +403,30 @@ function mapaRegras_(sheet) {
   }, {});
 }
 
-function maiorCoincidencia_(weekValues, sigla, regras) {
-  const dias = regras[normalizar_(sigla)] || [];
-  return weekValues.reduce((max, value) => {
-    const outros = regras[normalizar_(value)] || [];
-    const coincidencias = dias.reduce((total, day, index) => {
-      if (!day || !outros[index]) return total;
-      const paresMeioDia = CONFIG.halfDayOverlapPairsByWeekday[index] || [];
-      const meioDia = paresMeioDia.some(pair =>
-        (pair[0] === normalizar_(sigla) && pair[1] === normalizar_(value)) ||
-        (pair[1] === normalizar_(sigla) && pair[0] === normalizar_(value))
-      );
-      return total + (meioDia ? 0.5 : 1);
-    }, 0);
-    return Math.max(max, coincidencias);
+function somarCoincidenciasPorPar_(weekValues, sigla, regras) {
+  const candidate = normalizar_(sigla);
+  const participants = weekValues.map(normalizar_).filter(value => value && value !== candidate);
+  if (candidate) participants.push(candidate);
+  let total = 0;
+  for (let left = 0; left < participants.length; left += 1) {
+    for (let right = left + 1; right < participants.length; right += 1) {
+      const siglaA = participants[left];
+      const siglaB = participants[right];
+      total += contarDiasCoincidentes_(regras[siglaA] || [], regras[siglaB] || [], siglaA, siglaB);
+    }
+  }
+  return total;
+}
+
+function contarDiasCoincidentes_(diasA, diasB, siglaA, siglaB) {
+  const a = normalizar_(siglaA);
+  const b = normalizar_(siglaB);
+  return (diasA || []).reduce((total, dia, indice) => {
+    if (!dia || !diasB || !diasB[indice]) return total;
+    const meiaJornada = (CONFIG.halfDayOverlapPairsByWeekday[indice] || []).some(par =>
+      (par[0] === a && par[1] === b) || (par[0] === b && par[1] === a)
+    );
+    return total + (meiaJornada ? 0.5 : 1);
   }, 0);
 }
 
@@ -346,9 +441,7 @@ function carregarEscala_(sessionToken, sessionSigla) {
   const rules = mapaRegras_(sheet.getParent().getSheetByName(CONFIG.rulesName));
   const properties = PropertiesService.getScriptProperties();
   const canUseMemberSession = !!sessionToken && !!sessionSigla && validarSessaoMembro_(sessionToken) === normalizar_(sessionSigla);
-  const initialComplete = vagas_().filter(vaga => !CONFIG.blockedMonths.includes(vaga.month) && vaga.slotIndex === 0)
-    .every(vaga => normalizar_(sheet.getRange(vaga.row, vaga.column).getDisplayValue()));
-  const round = initialComplete ? 'conjunta' : 'individual';
+  const round = faseAtual_(sheet);
   return Object.keys(CONFIG.rows).map(month => ({
     id: month,
     name: month.toUpperCase(),
@@ -364,13 +457,24 @@ function carregarEscala_(sessionToken, sessionSigla) {
         period: sheet.getRange(row, periodColumn).getDisplayValue(),
         slots: CONFIG.columns[month].map((column, slotIndex) => {
           const value = sheet.getRange(row, column).getDisplayValue();
-          const available = !value && !CONFIG.blockedMonths.includes(month) && (round === 'individual' ? slotIndex === 0 : slotIndex > 0);
+          const weekValues = CONFIG.columns[month].map(weekColumn => normalizar_(sheet.getRange(row, weekColumn).getDisplayValue()));
+          const phaseAllows = round === 'individual' ? slotIndex === 0 : slotIndex > 0;
+          const predecessorsFilled = slotIndex === 1 ? !!weekValues[0] : slotIndex === 2 ? !!weekValues[0] && !!weekValues[1] : true;
+          const existingFirstTwoOverlapDays = weekValues[0] && weekValues[1]
+            ? somarCoincidenciasPorPar_(weekValues.slice(0, 2), '', rules)
+            : 0;
+          const sigla3HasTolerance = slotIndex !== 2 || existingFirstTwoOverlapDays < CONFIG.maxOverlapDays;
+          const available = !value && !CONFIG.blockedMonths.includes(month) && phaseAllows && predecessorsFilled && sigla3HasTolerance;
+          const explainSigla3Blocked = slotIndex === 2 && !value && !CONFIG.blockedMonths.includes(month)
+            && phaseAllows && predecessorsFilled && !sigla3HasTolerance
+            ? `SIGLA 3 bloqueada: SIGLA 1 e SIGLA 2 já coincidem em ${formatarDias_(existingFirstTwoOverlapDays)}. O limite é ${formatarDias_(CONFIG.maxOverlapDays)}.`
+            : '';
           const id = month + '-' + rowIndex + '-' + slotIndex;
           const canClear = canUseMemberSession && normalizar_(value) === normalizar_(sessionSigla) && properties.getProperty(chaveReservaSessao_(id)) === sessionToken;
           const otherSiglas = CONFIG.columns[month].map((otherColumn, otherIndex) => otherIndex === slotIndex ? '' : sheet.getRange(row, otherColumn).getDisplayValue())
             .map(normalizar_).filter(other => other && other !== normalizar_(value));
-          const overlapDays = value ? maiorCoincidencia_(otherSiglas, value, rules) : 0;
-          return { id, label: 'SIGLA ' + (slotIndex + 1), value, overlapDays, canClear, state: value ? 'filled' : (available ? 'available' : 'locked'), disabled: !available && !canClear };
+          const overlapDays = value ? somarCoincidenciasPorPar_(otherSiglas, value, rules) : 0;
+          return { id, label: 'SIGLA ' + (slotIndex + 1), value, overlapDays, canClear, blockedReason: explainSigla3Blocked, state: value ? 'filled' : (available ? 'available' : 'locked'), disabled: !available && !canClear && !explainSigla3Blocked };
         })
       };
     })
@@ -420,6 +524,7 @@ function overrideVaga_(request) {
   lock.waitLock(15000);
   try {
     const sheet = planilha_().getSheetByName(CONFIG.sheetName);
+    const roundBefore = faseAtual_(sheet);
     const cell = sheet.getRange(vaga.row, vaga.column);
     const value = String(request.value == null ? '' : request.value);
     const validation = cell.getDataValidation();
@@ -431,10 +536,16 @@ function overrideVaga_(request) {
       if (validation) cell.setDataValidation(validation);
     }
     PropertiesService.getScriptProperties().deleteProperty(chaveReservaSessao_(vaga.id));
+    const roundAfter = faseAtual_(sheet);
+    if (roundBefore === 'individual' && roundAfter === 'conjunta' && vaga.slotIndex === 0 && normalizar_(value)) {
+      definirInicioFase2_(sheet, value);
+    } else if (roundAfter === 'individual') {
+      PropertiesService.getScriptProperties().deleteProperty(CONFIG.phase2SequenceStartProperty);
+    }
     const rules = mapaRegras_(sheet.getParent().getSheetByName(CONFIG.rulesName));
     const otherSiglas = CONFIG.columns[vaga.month].map((column, index) => index === vaga.slotIndex ? '' : sheet.getRange(vaga.row, column).getDisplayValue())
       .map(normalizar_).filter(other => other && other !== normalizar_(value));
-    const overlapDays = value ? maiorCoincidencia_(otherSiglas, value, rules) : 0;
+    const overlapDays = value ? somarCoincidenciasPorPar_(otherSiglas, value, rules) : 0;
     const note = overlapDays ? `Coincidência com outra sigla: ${formatarDias_(overlapDays)}. ${String(request.justification).trim()}` : String(request.justification).trim();
     auditar_('admin_override', value, request.vaga, 'OK', note);
   } finally {

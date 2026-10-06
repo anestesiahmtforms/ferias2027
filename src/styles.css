@@ -65,6 +65,9 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .admin-ok { color: #16716f !important; font-weight: 800; }
 .audit-list { max-height: 260px; overflow: auto; display: grid; gap: 7px; text-align: left; }
 .audit-list div { display: grid; gap: 2px; padding: 8px; border-radius: 9px; background: #f2f7fa; font-size: .78rem; }
+.status-card { flex-wrap: wrap; }
+.whatsapp-invite { flex: 1 1 100%; margin-left: 18px; color: #214965; font-size: .82rem; }
+.whatsapp-invite a { color: #117454; font-weight: 800; text-decoration-thickness: 2px; text-underline-offset: 2px; }
 .audit-list small { color: #65778a; }
 @media (max-width: 760px) { .shell { width: 94%; height: 92%; padding: 10px clamp(8px, 2.5vw, 14px); gap: clamp(5px, 1vh, 9px); } .schedule-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; } .schedule-table .month-title div { gap: 6px; flex-wrap: wrap; } .app-header { align-items: flex-start; gap: 8px; padding: 2px 0 4px; } .brand { width: 72px; height: 36px; } .subtitle { font-size: .78rem; } .toolbar { padding: 4px 0 6px; } .app-footer { margin-top: 2px; padding-top: 8px; } }
 @media (max-width: 380px) { .shell { width: 96%; padding-inline: 7px; } .app-header { gap: 6px; } .brand { width: 58px; height: 32px; } h1 { font-size: clamp(1.12rem, 5.2vw, 1.35rem); } .status-card { gap: 7px; padding: 8px 10px; font-size: .8rem; } }

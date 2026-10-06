@@ -62,6 +62,51 @@ test('allows three coincident working days and rejects four in the joint round',
   assert.equal(validarReserva_({ ...base(), slotIndex: 1, round: 'conjunta', overlapDays: 4 }).codigo, 'COINCIDENCIA_DIAS');
 });
 
+test('uses phase-specific quotas for the January/July group and other siglas', () => {
+  const { limiteSemanas_, validarReserva_ } = loadRules();
+  assert.equal(limiteSemanas_('FR', 'individual'), 1);
+  assert.equal(limiteSemanas_('CR', 'individual'), 2);
+  assert.equal(limiteSemanas_('FR', 'conjunta'), 2);
+  assert.equal(limiteSemanas_('BA', 'conjunta'), 2);
+  assert.equal(validarReserva_({ ...base(), round: 'conjunta', slotIndex: 1, weeksForSigla: 1 }).ok, true);
+  assert.equal(validarReserva_({ ...base(), round: 'conjunta', slotIndex: 1, weeksForSigla: 2 }).codigo, 'LIMITE_SEMANAS');
+});
+
+test('blocks SIGLA 3 when SIGLA 1 and SIGLA 2 already use the three-day tolerance', () => {
+  const { validarReserva_ } = loadRules();
+  const result = validarReserva_({
+    ...base(), round: 'conjunta', slotIndex: 2,
+    slotPrerequisitesMet: true, existingFirstTwoOverlapDays: 3, overlapDays: 3
+  });
+  assert.equal(result.codigo, 'SIGLA3_BLOQUEADA_TOLERANCIA');
+  assert.equal(result.overlapDays, 3);
+});
+
+test('sums weekday coincidences separately for each pair', () => {
+  const { somarCoincidenciasPorPar_ } = loadRules();
+  const rules = {
+    CR: [1, 0, 0, 0, 0],
+    AD: [1, 0, 0, 0, 0],
+    LH: [1, 0, 0, 0, 0]
+  };
+  assert.equal(somarCoincidenciasPorPar_(['AD', 'LH'], 'CR', rules), 3);
+});
+
+test('applies each approved half-day pair exception in its weekday', () => {
+  const { contarDiasCoincidentes_ } = loadRules();
+  const exceptions = [
+    ['CH', 'FL', 0], ['RO', 'AA', 1], ['DE', 'BA', 2], ['LC', 'GU', 2],
+    ['RO', 'AA', 3], ['L2', 'BA', 4], ['GB', 'AA', 4]
+  ];
+  for (const [siglaA, siglaB, weekday] of exceptions) {
+    const daysA = [0, 0, 0, 0, 0];
+    const daysB = [0, 0, 0, 0, 0];
+    daysA[weekday] = 1;
+    daysB[weekday] = 1;
+    assert.equal(contarDiasCoincidentes_(daysA, daysB, siglaA, siglaB), 0.5, `${siglaA}/${siglaB} weekday ${weekday}`);
+  }
+});
+
 test('rejects an already occupied or repeated week', () => {
   const { validarReserva_ } = loadRules();
   assert.equal(validarReserva_({ ...base(), currentValue: 'AA' }).codigo, 'VAGA_OCUPADA');
