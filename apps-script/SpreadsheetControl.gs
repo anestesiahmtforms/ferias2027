@@ -137,7 +137,7 @@ function obterVagasLiberadas_(aba) {
   todasVagas_().forEach(vaga => {
     const range = aba.getRange(vaga.linha, vaga.coluna);
     if (range.getDisplayValue().trim()) return;
-    if (vagaPermitidaNaRodada_(vaga, rodada) && precedentesPreenchidos_(aba, vaga) && !vagaSigla3BloqueadaNoSabado_(aba, vaga)) liberadas.push(range);
+    if (vagaPermitidaNaRodada_(vaga, rodada) && precedentesPreenchidos_(aba, vaga) ) liberadas.push(range);
   });
   return liberadas;
 }
