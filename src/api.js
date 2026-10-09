@@ -17,6 +17,7 @@ export function createApi(baseUrl, fetchImpl = fetch) {
     cancelOwnReservation: (vaga, sessionToken) => request('', { action: 'cancelOwn', vaga, sessionToken }),
     submitReservation: ({ sigla, pin, vaga, sessionToken }) => request('', { action: 'reserve', sigla, pin, vaga, sessionToken }),
     authenticateAdmin: pin => request('', { action: 'admin', operation: 'schedule', pin }),
+    prepareInvite: (sigla, invitePin, pin) => request('', { action: 'admin', operation: 'prepareInvite', sigla, invitePin, pin }),
     changeMemberPin: (sigla, newPin, pin) => request('', { action: 'admin', operation: 'changePin', sigla, newPin, pin }),
     overrideSlot: (vaga, value, justification, pin) => request('', { action: 'admin', operation: 'override', vaga, value, justification, pin }),
     reopenMemberSession: (sigla, pin) => request('', { action: 'admin', operation: 'reopenMemberSession', sigla, pin })
