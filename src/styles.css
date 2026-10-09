@@ -90,3 +90,6 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .admin-invite-dialog h2 { margin: 0; color: #0f4c81; }
 .admin-invite-dialog p { font-weight: 750; }
 .admin-invite-dialog button { padding: 12px; border: 0; border-radius: 10px; font-weight: 750; cursor: pointer; }
+
+/* Convite sempre visível acima da Gestão Administrativa no celular */
+.admin-invite-overlay { position: fixed; inset: 0; z-index: 40; border-radius: 0; overflow-y: auto; }
