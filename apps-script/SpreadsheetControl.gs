@@ -95,10 +95,15 @@ function onEditFerias(e) {
   }
 
   const regras = mapaRegras_();
-  if (vagaSigla3BloqueadaNoSabado_(range.getSheet(), vaga)) {
-    range.clearContent();
-    avisar_(range.getSheet(), 'SIGLA 3 está bloqueada: esta semana já tem duas siglas de férias. O sábado não pode ter três profissionais de férias.');
-    return;
+  if (vaga.indiceSigla === 2) {
+    const sabado = conferirSabadoDaSemana_(range.getSheet(), vaga, sigla);
+    if (!sabado.verificado || sabado.tres) {
+      range.clearContent();
+      avisar_(range.getSheet(), sabado.tres
+        ? 'A terceira sigla não pode ser marcada: os três profissionais estão escalados no sábado.'
+        : 'Não foi possível conferir a escala de sábado. Tente novamente.');
+      return;
+    }
   }
   const semanasJaMarcadas = contarSemanasDaSigla_(range.getSheet(), sigla, range.getA1Notation(), rodada);
   if (atingiuLimiteSemanas_(semanasJaMarcadas, sigla, rodada)) {
