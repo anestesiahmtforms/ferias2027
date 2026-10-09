@@ -82,6 +82,15 @@ test('blocks SIGLA 3 when SIGLA 1 and SIGLA 2 already use the three-day toleranc
   assert.equal(result.overlapDays, 3);
 });
 
+test('blocks a third vacation in the same week because Saturday cannot have three professionals', () => {
+  const { validarReserva_ } = loadRules();
+  const result = validarReserva_({
+    ...base(), round: 'conjunta', slotIndex: 2,
+    slotPrerequisitesMet: true, weekValues: ['CR', 'AD', '']
+  });
+  assert.equal(result.codigo, 'SABADO_TRES_PROFISSIONAIS');
+});
+
 test('sums weekday coincidences separately for each pair', () => {
   const { somarCoincidenciasPorPar_ } = loadRules();
   const rules = {
