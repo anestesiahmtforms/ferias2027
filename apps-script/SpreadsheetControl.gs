@@ -220,6 +220,8 @@ function conferirSabadoDaSemana_(aba, vaga, sigla) {
 }
 
 function limiteSemanasPorSigla_(sigla, rodada) {
+  // Excecao da primeira participacao de GB na Fase 2: somente uma semana.
+  if (rodada === 'conjunta' && normalizarSigla_(sigla) === 'GB') return 1;
   if (rodada === 'conjunta') return CONFIG.maxSemanas;
   return CONFIG.siglasUmaSemana.includes(normalizarSigla_(sigla)) ? 1 : CONFIG.maxSemanas;
 }
