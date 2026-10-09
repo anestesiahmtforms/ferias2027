@@ -165,7 +165,7 @@ function proximoConviteAdministrativo_(sheet) {
   const sigla = primeiraPendenteSequencia_(sheet, counts, round);
   if (!sigla) return null;
   const pin = propriedade_('INVITE_PIN_' + sigla);
-  return /^\d{4}$/.test(pin) ? { sigla, pin } : null;
+  return { sigla, pin: /^\d{4}$/.test(pin) ? pin : '', requiresSetup: !/^\d{4}$/.test(pin) };
 }
 
 function definirInicioFase2_(sheet, siglaFinal) {
@@ -321,10 +321,26 @@ function processarAdmin_(request) {
     const sheet = planilha_().getSheetByName(CONFIG.sheetName);
     return { ok: true, codigo: 'OK', escala: carregarEscala_(), auditoria: lerAuditoria_(), siglas: Object.keys(mapaRegras_(planilha_().getSheetByName(CONFIG.rulesName))), proximoConvite: proximoConviteAdministrativo_(sheet) };
   }
+  if (request.operation === 'prepareInvite') return prepararConvite_(request);
   if (request.operation === 'changePin') return trocarPin_(request);
   if (request.operation === 'override') return overrideVaga_(request);
   if (request.operation === 'reopenMemberSession') return reabrirSessaoMembro_(request);
   return { ok: false, codigo: 'OPERACAO_ADMIN_INVALIDA', mensagem: 'Operação administrativa não reconhecida.' };
+}
+
+function prepararConvite_(request) {
+  const sheet = planilha_().getSheetByName(CONFIG.sheetName);
+  const expected = proximoConviteAdministrativo_(sheet);
+  if (!expected) return { ok: false, mensagem: 'Não existe profissional pendente na fila.' };
+  const sigla = normalizar_(request.sigla);
+  const pin = String(request.invitePin || '');
+  if (sigla !== expected.sigla) return { ok: false, mensagem: 'A fila mudou. Atualize a gestão administrativa.' };
+  if (!/^\d{4}$/.test(pin)) return { ok: false, mensagem: 'Informe quatro dígitos para o novo PIN.' };
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('PIN_' + sigla, hashPin_(pin, propriedade_('PIN_SALT')));
+  props.setProperty('INVITE_PIN_' + sigla, pin);
+  auditar_('convite_preparado', sigla, '', 'OK', 'PIN configurado pelo administrador para convite.');
+  return { ok: true, proximoConvite: { sigla, pin } };
 }
 
 function validarPinMembro_(sigla, pin) {
