@@ -12,6 +12,7 @@ const CONFIG = {
   bookingSequence: ['CR', 'AD', 'LH', 'FR', 'DE', 'LE', 'RO', 'AA', 'MA', 'RA', 'LU', 'LC', 'FL', 'L2', 'RL', 'MH', 'RC', 'LD', 'DN', 'WE', 'BA', 'GU', 'JA', 'IG', 'AL', 'GB'],
   phase2SequenceStartProperty: 'PHASE2_SEQUENCE_START_SIGLA',
   maxOverlapDays: 3,
+  saturdaySpreadsheetId: '13ymRGSscE2OOFUH6-77Q_j9J3McaDJQTIUuZVYRFbxg',
   halfDayOverlapPairsByWeekday: [
     [['CH', 'FL']],
     [['RO', 'AA']],
@@ -63,7 +64,10 @@ function validarReserva_(input) {
   if (data.round === 'individual' && Number(data.slotIndex) !== 0) return { ok: false, codigo: 'RODADA_INICIAL' };
   if (data.round === 'conjunta' && Number(data.slotIndex) === 0) return { ok: false, codigo: 'RODADA_CONJUNTA' };
   if (data.round === 'conjunta' && data.slotPrerequisitesMet === false) return { ok: false, codigo: 'VAGA_ANTECEDENTE' };
-  if (data.round === 'conjunta' && Number(data.slotIndex) === 2 && (data.weekValues || []).filter(normalizar_).length >= 2) {
+  if (data.round === 'conjunta' && Number(data.slotIndex) === 2 && data.saturdayRosterVerified === false) {
+    return { ok: false, codigo: 'SABADO_NAO_VERIFICADO' };
+  }
+  if (data.round === 'conjunta' && Number(data.slotIndex) === 2 && data.saturdayThree) {
     return { ok: false, codigo: 'SABADO_TRES_PROFISSIONAIS' };
   }
   if (data.sequenceBlockedBy) {
@@ -74,9 +78,6 @@ function validarReserva_(input) {
       antecedente: data.sequenceBlockedBy,
       semanasAntecedente: data.weeksForSequenceBlocker
     };
-  }
-  if (data.round === 'conjunta' && Number(data.slotIndex) === 2 && Number(data.existingFirstTwoOverlapDays || 0) >= CONFIG.maxOverlapDays) {
-    return { ok: false, codigo: 'SIGLA3_BLOQUEADA_TOLERANCIA', overlapDays: Number(data.existingFirstTwoOverlapDays) };
   }
   if (data.round === 'conjunta' && Number(data.overlapDays || 0) > CONFIG.maxOverlapDays) return { ok: false, codigo: 'COINCIDENCIA_DIAS', overlapDays: Number(data.overlapDays) };
   return { ok: true, codigo: 'OK' };
@@ -375,7 +376,8 @@ const mensagens_ = {
   VAGA_OCUPADA: 'Esta vaga já foi preenchida.',
   RODADA_INICIAL: 'As férias conjuntas ainda não estão liberadas.',
   RODADA_CONJUNTA: 'A vaga inicial desta semana ainda deve ser preenchida.',
-  VAGA_ANTECEDENTE: 'Preencha as vagas anteriores desta semana antes de escolher esta sigla.',
+  VAGA_ANTECEDENTE: 'A primeira sigla da semana deve estar preenchida antes da escolha.',
+  SABADO_NAO_VERIFICADO: 'Não foi possível consultar a escala de sábado desta semana. A terceira sigla não pode ser confirmada até validar a escala.',
   COINCIDENCIA_DIAS: 'A combinação ultrapassa três dias úteis coincidentes.',
   SIGLA3_BLOQUEADA_TOLERANCIA: 'SIGLA 3 está bloqueada: SIGLA 1 e SIGLA 2 já atingiram o limite de três dias úteis coincidentes.',
   SIGLA_REPETIDA: 'A sigla já está registrada nesta semana.',
@@ -408,7 +410,7 @@ function estadoAtual_(sheet, target, sigla) {
   const weekValues = CONFIG.columns[target.month].map(column => normalizar_(sheet.getRange(target.row, column).getDisplayValue()));
   const firstSlotFilled = !!weekValues[0];
   const secondSlotFilled = !!weekValues[1];
-  const slotPrerequisitesMet = target.slotIndex === 1 ? firstSlotFilled : target.slotIndex === 2 ? firstSlotFilled && secondSlotFilled : true;
+  const slotPrerequisitesMet = target.slotIndex > 0 ? firstSlotFilled : true;
   const existingFirstTwoOverlapDays = firstSlotFilled && secondSlotFilled
     ? somarCoincidenciasPorPar_(weekValues.slice(0, 2), '', allowedSiglas)
     : 0;
@@ -417,7 +419,33 @@ function estadoAtual_(sheet, target, sigla) {
   const sequenceBlockedBy = antecedentePendenteSequencia_(sheet, weeksBySigla, sigla, round);
   const weeksForSequenceBlocker = sequenceBlockedBy ? limiteSemanas_(sequenceBlockedBy, round) : 0;
   const overlapDays = somarCoincidenciasPorPar_(weekValues, sigla, allowedSiglas);
-  return { round, allowedSiglas, weeksForSigla, weekValues, overlapDays, sequenceBlockedBy, weeksForSequenceBlocker, slotPrerequisitesMet, existingFirstTwoOverlapDays };
+  const saturdayCheck = round === 'conjunta' && target.slotIndex === 2 && firstSlotFilled && secondSlotFilled
+    ? verificarSabadoSemana_(sheet, target.month, target.row, [...weekValues.slice(0, 2), sigla])
+    : { verified: true, three: false };
+  return { round, allowedSiglas, weeksForSigla, weekValues, overlapDays, sequenceBlockedBy, weeksForSequenceBlocker, slotPrerequisitesMet, existingFirstTwoOverlapDays, saturdayRosterVerified: saturdayCheck.verified, saturdayThree: saturdayCheck.three };
+}
+
+function verificarSabadoSemana_(sheet, month, row, siglas) {
+  // Conferência na escala semanal definitiva, sem alterar os lançamentos existentes.
+  const periodColumn = CONFIG.columns[month][0] > 5 ? 8 : 2;
+  const period = String(sheet.getRange(row, periodColumn).getDisplayValue() || '');
+  const match = period.match(/\b\d{1,2}\s*A\s*(\d{1,2})\/(\d{1,2})\b/i);
+  if (!match) return { verified: false, three: false };
+  const endMonth = Number(match[2]);
+  const year = month === 'dezembro' && endMonth === 1 ? 2028 : 2027;
+  const saturday = new Date(year, endMonth - 1, Number(match[1]) - 1);
+  const dateKey = Utilities.formatDate(saturday, 'America/Sao_Paulo', 'dd/MM/yyyy');
+  try {
+    const weekly = SpreadsheetApp.openById(CONFIG.saturdaySpreadsheetId).getSheetByName('SÁBADO');
+    if (!weekly || weekly.getLastRow() < 6) return { verified: false, three: false };
+    const entries = weekly.getRange(6, 1, weekly.getLastRow() - 5, 18).getDisplayValues();
+    const saturdayRow = entries.find(values => String(values[0] || '').trim() === dateKey);
+    if (!saturdayRow) return { verified: false, three: false };
+    const working = new Set(saturdayRow.slice(1).map(normalizar_).filter(Boolean));
+    return { verified: true, three: siglas.map(normalizar_).filter(sigla => working.has(sigla)).length >= 3 };
+  } catch (_error) {
+    return { verified: false, three: false };
+  }
 }
 
 function mapaRegras_(sheet) {
@@ -484,24 +512,15 @@ function carregarEscala_(sessionToken, sessionSigla) {
           const value = sheet.getRange(row, column).getDisplayValue();
           const weekValues = CONFIG.columns[month].map(weekColumn => normalizar_(sheet.getRange(row, weekColumn).getDisplayValue()));
           const phaseAllows = round === 'individual' ? slotIndex === 0 : slotIndex > 0;
-          const predecessorsFilled = slotIndex === 1 ? !!weekValues[0] : slotIndex === 2 ? !!weekValues[0] && !!weekValues[1] : true;
-          const existingFirstTwoOverlapDays = weekValues[0] && weekValues[1]
-            ? somarCoincidenciasPorPar_(weekValues.slice(0, 2), '', rules)
-            : 0;
-          const firstSlotFilled = !!weekValues[0];
-          const secondSlotFilled = !!weekValues[1];
-          const sigla3BlockedBySaturday = slotIndex === 2 && firstSlotFilled && secondSlotFilled;
-          const available = !value && !CONFIG.blockedMonths.includes(month) && phaseAllows && predecessorsFilled && !sigla3BlockedBySaturday;
-          const explainSigla3Blocked = slotIndex === 2 && !value && !CONFIG.blockedMonths.includes(month)
-            && phaseAllows && predecessorsFilled && sigla3BlockedBySaturday
-            ? 'SIGLA 3 bloqueada: esta semana já tem duas siglas de férias. O sábado não pode ter três profissionais de férias.'
-            : '';
+          const predecessorsFilled = slotIndex > 0 ? !!weekValues[0] : true;
+          // A elegibilidade da SIGLA 3 depende da sigla escolhida; validar o sábado no servidor ao salvar.
+          const available = !value && !CONFIG.blockedMonths.includes(month) && phaseAllows && predecessorsFilled;
           const id = month + '-' + rowIndex + '-' + slotIndex;
           const canClear = canUseMemberSession && normalizar_(value) === normalizar_(sessionSigla) && properties.getProperty(chaveReservaSessao_(id)) === sessionToken;
           const otherSiglas = CONFIG.columns[month].map((otherColumn, otherIndex) => otherIndex === slotIndex ? '' : sheet.getRange(row, otherColumn).getDisplayValue())
             .map(normalizar_).filter(other => other && other !== normalizar_(value));
           const overlapDays = value ? somarCoincidenciasPorPar_(otherSiglas, value, rules) : 0;
-          return { id, label: 'SIGLA ' + (slotIndex + 1), value, overlapDays, canClear, blockedReason: explainSigla3Blocked, state: value ? 'filled' : (available ? 'available' : 'locked'), disabled: !available && !canClear && !explainSigla3Blocked };
+          return { id, label: 'SIGLA ' + (slotIndex + 1), value, overlapDays, canClear, blockedReason: '', state: value ? 'filled' : (available ? 'available' : 'locked'), disabled: !available && !canClear };
         })
       };
     })
