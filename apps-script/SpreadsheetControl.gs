@@ -95,12 +95,9 @@ function onEditFerias(e) {
   }
 
   const regras = mapaRegras_();
-  if (vagaSigla3BloqueadaPelaTolerancia_(range.getSheet(), vaga, regras)) {
-    const coincidencia = coincidenciaPrimeirasDuasSiglas_(range.getSheet(), vaga, regras);
-    const dias = String(coincidencia).replace('.', ',');
-    const unidade = coincidencia === 1 || coincidencia < 1 ? 'dia útil' : 'dias úteis';
+  if (vagaSigla3BloqueadaNoSabado_(range.getSheet(), vaga)) {
     range.clearContent();
-    avisar_(range.getSheet(), 'SIGLA 3 está bloqueada: SIGLA 1 e SIGLA 2 já somam ' + dias + ' ' + unidade + ' coincidentes; o limite é ' + CONFIG.maxDiasCoincidencia + ' dias úteis.');
+    avisar_(range.getSheet(), 'SIGLA 3 está bloqueada: esta semana já tem duas siglas de férias. O sábado não pode ter três profissionais de férias.');
     return;
   }
   const semanasJaMarcadas = contarSemanasDaSigla_(range.getSheet(), sigla, range.getA1Notation(), rodada);
@@ -140,7 +137,7 @@ function obterVagasLiberadas_(aba) {
   todasVagas_().forEach(vaga => {
     const range = aba.getRange(vaga.linha, vaga.coluna);
     if (range.getDisplayValue().trim()) return;
-    if (vagaPermitidaNaRodada_(vaga, rodada) && precedentesPreenchidos_(aba, vaga) && !vagaSigla3BloqueadaPelaTolerancia_(aba, vaga, regras)) liberadas.push(range);
+    if (vagaPermitidaNaRodada_(vaga, rodada) && precedentesPreenchidos_(aba, vaga) && !vagaSigla3BloqueadaNoSabado_(aba, vaga)) liberadas.push(range);
   });
   return liberadas;
 }
@@ -187,6 +184,12 @@ function coincidenciaPrimeirasDuasSiglas_(aba, vaga, regras) {
 
 function vagaSigla3BloqueadaPelaTolerancia_(aba, vaga, regras) {
   return vaga.indiceSigla === 2 && coincidenciaPrimeirasDuasSiglas_(aba, vaga, regras) >= CONFIG.maxDiasCoincidencia;
+}
+
+function vagaSigla3BloqueadaNoSabado_(aba, vaga) {
+  if (vaga.indiceSigla !== 2) return false;
+  return CONFIG.colunas[vaga.mes].slice(0, 2)
+    .every(coluna => !!normalizarSigla_(aba.getRange(vaga.linha, coluna).getDisplayValue()));
 }
 
 function limiteSemanasPorSigla_(sigla, rodada) {
