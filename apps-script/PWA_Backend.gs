@@ -97,6 +97,8 @@ function pwa_verificarPin_(pin, expectedHash, salt) {
 }
 
 function pwa_limiteSemanas_(sigla, round) {
+  // Excecao da primeira participacao de GB na Fase 2: somente uma semana.
+  if (round === 'conjunta' && pwa_normalizar_(sigla) === 'GB') return 1;
   if (round === 'conjunta') return pwa_CONFIG.maxWeeks;
   return pwa_CONFIG.singleWeekSiglas.includes(pwa_normalizar_(sigla)) ? 1 : pwa_CONFIG.maxWeeks;
 }
