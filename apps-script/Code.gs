@@ -96,6 +96,8 @@ function verificarPin_(pin, expectedHash, salt) {
 }
 
 function limiteSemanas_(sigla, round) {
+  // Excecao da primeira participacao de GB na Fase 2: somente uma semana.
+  if (round === 'conjunta' && normalizar_(sigla) === 'GB') return 1;
   if (round === 'conjunta') return CONFIG.maxWeeks;
   return CONFIG.singleWeekSiglas.includes(normalizar_(sigla)) ? 1 : CONFIG.maxWeeks;
 }
