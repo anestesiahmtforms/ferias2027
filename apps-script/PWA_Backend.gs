@@ -57,7 +57,7 @@ function pwa_validarReserva_(input) {
   const data = input || {};
   const sigla = pwa_normalizar_(data.sigla);
   if (!data.allowedSiglas || !data.allowedSiglas[sigla]) return { ok: false, codigo: 'SIGLA_INVALIDA' };
-  if (pwa_CONFIG.blockedMonths.includes(String(data.month || '').trim().toLowerCase())) return { ok: false, codigo: 'MES_BLOQUEADO' };
+  if (data.round === 'individual' && pwa_CONFIG.blockedMonths.includes(String(data.month || '').trim().toLowerCase())) return { ok: false, codigo: 'MES_BLOQUEADO' };
   if (pwa_normalizar_(data.currentValue)) return { ok: false, codigo: 'VAGA_OCUPADA' };
   const maxWeeks = pwa_limiteSemanas_(sigla, data.round);
   if (Number(data.weeksForSigla || 0) >= maxWeeks) return { ok: false, codigo: 'LIMITE_SEMANAS', maxWeeks };
@@ -103,7 +103,7 @@ function pwa_limiteSemanas_(sigla, round) {
 
 function pwa_contarSemanasPorSigla_(sheet, round) {
   const counts = {};
-  Object.keys(pwa_CONFIG.rows).filter(month => !pwa_CONFIG.blockedMonths.includes(month)).forEach(month => {
+  Object.keys(pwa_CONFIG.rows).filter(month => round === 'conjunta' || !pwa_CONFIG.blockedMonths.includes(month)).forEach(month => {
     const rows = pwa_CONFIG.rows[month];
     const columns = pwa_CONFIG.columns[month];
     sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
@@ -373,7 +373,7 @@ function pwa_mensagemResultado_(result) {
 }
 
 const pwa_mensagens_ = {
-  MES_BLOQUEADO: 'Janeiro e julho estão bloqueados nesta rodada.',
+  MES_BLOQUEADO: 'Janeiro e julho são reservados na primeira fase; as vagas livres são liberadas na segunda fase.',
   VAGA_OCUPADA: 'Esta vaga já foi preenchida.',
   RODADA_INICIAL: 'As férias conjuntas ainda não estão liberadas.',
   RODADA_CONJUNTA: 'A vaga inicial desta semana ainda deve ser preenchida.',
@@ -500,7 +500,7 @@ function pwa_carregarEscala_(sessionToken, sessionSigla) {
     id: month,
     name: month.toUpperCase(),
     phase: round === 'conjunta' ? 'Férias conjuntas liberadas' : 'Rodada individual',
-    blocked: pwa_CONFIG.blockedMonths.includes(month),
+    blocked: round === 'individual' && pwa_CONFIG.blockedMonths.includes(month),
     weeks: pwa_CONFIG.rows[month].map((row, rowIndex) => {
       const right = pwa_CONFIG.columns[month][0] > 5;
       const labelColumn = right ? 7 : 1;
@@ -515,7 +515,7 @@ function pwa_carregarEscala_(sessionToken, sessionSigla) {
           const phaseAllows = round === 'individual' ? slotIndex === 0 : slotIndex > 0;
           const predecessorsFilled = slotIndex > 0 ? !!weekValues[0] : true;
           // A elegibilidade da SIGLA 3 depende da sigla escolhida; validar o sábado no servidor ao salvar.
-          const available = !value && !pwa_CONFIG.blockedMonths.includes(month) && phaseAllows && predecessorsFilled;
+          const available = !value && (round === 'conjunta' || !pwa_CONFIG.blockedMonths.includes(month)) && phaseAllows && predecessorsFilled;
           const id = month + '-' + rowIndex + '-' + slotIndex;
           const canClear = canUseMemberSession && pwa_normalizar_(value) === pwa_normalizar_(sessionSigla) && properties.getProperty(pwa_chaveReservaSessao_(id)) === sessionToken;
           const otherSiglas = pwa_CONFIG.columns[month].map((otherColumn, otherIndex) => otherIndex === slotIndex ? '' : sheet.getRange(row, otherColumn).getDisplayValue())
