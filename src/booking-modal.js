@@ -4,6 +4,32 @@ export function validateBookingForm({ sigla, pin }) {
   return { ok: true };
 }
 
+export function hasCompletedVacationChoices(result, sigla) {
+  if (!result?.ok || !Array.isArray(result.escala) || !sigla) return false;
+  const target = String(sigla).trim().toUpperCase();
+  const weeks = new Set();
+  result.escala.forEach(month => {
+    (month.weeks || []).forEach(week => {
+      if ((week.slots || []).some(slot => String(slot.value || '').trim().toUpperCase() === target)) {
+        weeks.add(`${month.id || month.name || ''}:${week.id || week.period || week.label || ''}`);
+      }
+    });
+  });
+  return weeks.size >= 2;
+}
+
+function showCompletionBanner(backdrop, close, result) {
+  const modal = backdrop.querySelector('.booking-modal');
+  modal.classList.add('vacation-complete');
+  modal.setAttribute('aria-labelledby', 'vacation-complete-title');
+  modal.innerHTML = `<div class="vacation-check" aria-hidden="true">✓</div>
+    <h2 id="vacation-complete-title">Escolhas finalizadas!</h2>
+    <p>Você finalizou suas escolhas.</p>
+    <p class="vacation-wish">Boas férias! 🌴☀️</p>
+    <button class="primary vacation-finish" type="button">Concluir</button>`;
+  modal.querySelector('.vacation-finish').addEventListener('click', () => close(result));
+}
+
 export function openBookingModal(slotId, { siglas = [], session = null, startSession = async () => ({ ok: false }), submit = async () => ({ ok: false }), onSession = async () => {}, onDone = () => {}, onFailure = () => {} } = {}) {
   return new Promise(resolve => {
     let currentSession = session;
@@ -50,7 +76,11 @@ export function openBookingModal(slotId, { siglas = [], session = null, startSes
       let result;
       try { result = await submit({ sigla: currentSession.sigla, vaga: slotId, sessionToken: currentSession.token }); }
       catch (_error) { result = { ok: false, mensagem: 'Falha de conexão. Sua sessão continua ativa; confira a escala antes de tentar novamente.' }; }
-      if (result.ok) { onDone(result); close(result); }
+      if (result.ok) {
+        onDone(result);
+        if (hasCompletedVacationChoices(result, currentSession.sigla)) showCompletionBanner(backdrop, close, result);
+        else close(result);
+      }
       else {
         button.disabled = false;
         error.textContent = result.mensagem || 'A escolha foi recusada.';
