@@ -166,7 +166,7 @@ function pwa_proximoConviteAdministrativo_(sheet) {
   const sigla = pwa_primeiraPendenteSequencia_(sheet, counts, round);
   if (!sigla) return null;
   const pin = pwa_propriedade_('INVITE_PIN_' + sigla);
-  return /^\d{4}$/.test(pin) ? { sigla, pin } : null;
+  return { sigla, pin: /^\d{4}$/.test(pin) ? pin : '', requiresSetup: !/^\d{4}$/.test(pin) };
 }
 
 function pwa_definirInicioFase2_(sheet, siglaFinal) {
@@ -322,10 +322,26 @@ function pwa_processarAdmin_(request) {
     const sheet = pwa_planilha_().getSheetByName(pwa_CONFIG.sheetName);
     return { ok: true, codigo: 'OK', escala: pwa_carregarEscala_(), auditoria: pwa_lerAuditoria_(), siglas: Object.keys(pwa_mapaRegras_(pwa_planilha_().getSheetByName(pwa_CONFIG.rulesName))), proximoConvite: pwa_proximoConviteAdministrativo_(sheet) };
   }
+  if (request.operation === 'prepareInvite') return pwa_prepararConvite_(request);
   if (request.operation === 'changePin') return pwa_trocarPin_(request);
   if (request.operation === 'override') return pwa_overrideVaga_(request);
   if (request.operation === 'reopenMemberSession') return pwa_reabrirSessaoMembro_(request);
   return { ok: false, codigo: 'OPERACAO_ADMIN_INVALIDA', mensagem: 'Operação administrativa não reconhecida.' };
+}
+
+function pwa_prepararConvite_(request) {
+  const sheet = pwa_planilha_().getSheetByName(pwa_CONFIG.sheetName);
+  const expected = pwa_proximoConviteAdministrativo_(sheet);
+  if (!expected) return { ok: false, mensagem: 'Não existe profissional pendente na fila.' };
+  const sigla = pwa_normalizar_(request.sigla);
+  const pin = String(request.invitePin || '');
+  if (sigla !== expected.sigla) return { ok: false, mensagem: 'A fila mudou. Atualize a gestão administrativa.' };
+  if (!/^\d{4}$/.test(pin)) return { ok: false, mensagem: 'Informe quatro dígitos para o novo PIN.' };
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('PIN_' + sigla, pwa_hashPin_(pin, pwa_propriedade_('PIN_SALT')));
+  props.setProperty('INVITE_PIN_' + sigla, pin);
+  pwa_auditar_('convite_preparado', sigla, '', 'OK', 'PIN configurado pelo administrador para convite.');
+  return { ok: true, proximoConvite: { sigla, pin } };
 }
 
 function pwa_validarPinMembro_(sigla, pin) {
