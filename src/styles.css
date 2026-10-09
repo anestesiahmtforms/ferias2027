@@ -74,3 +74,12 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 @media (max-width: 760px) { .shell { width: 94%; height: 92%; padding: 10px clamp(8px, 2.5vw, 14px); gap: clamp(5px, 1vh, 9px); } .schedule-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; } .schedule-table .month-title div { gap: 6px; flex-wrap: wrap; } .app-header { align-items: flex-start; gap: 8px; padding: 2px 0 4px; } .brand { width: 72px; height: 36px; } .subtitle { font-size: .78rem; } .toolbar { padding: 4px 0 6px; } .app-footer { margin-top: 2px; padding-top: 8px; } }
 @media (max-width: 380px) { .shell { width: 96%; padding-inline: 7px; } .app-header { gap: 6px; } .brand { width: 58px; height: 32px; } h1 { font-size: clamp(1.12rem, 5.2vw, 1.35rem); } .status-card { gap: 7px; padding: 8px 10px; font-size: .8rem; } }
 @media (max-height: 700px) { .shell { height: 94%; gap: 5px; padding-block: 6px; } .app-header { padding-block: 0 2px; } .brand { height: 30px; } .subtitle { font-size: .74rem; } .status-card { padding-block: 6px; } .toolbar { padding-block: 2px 4px; } .toolbar button, .app-footer button { padding-block: 7px; } .app-footer { margin-top: 0; padding-top: 6px; } }
+
+/* Confirmação final das duas semanas de férias */
+.vacation-complete { text-align: center; justify-items: center; padding: 32px 24px; gap: 14px; }
+.vacation-check { display: grid; place-items: center; width: 74px; height: 74px; border-radius: 50%; color: #fff; background: #16865b; font-size: 2.7rem; font-weight: 800; box-shadow: 0 8px 22px #16865b35; animation: vacation-appear .45s ease-out both; }
+.vacation-complete h2 { color: #16865b; font-size: clamp(1.35rem, 5vw, 1.7rem); }
+.vacation-complete .vacation-wish { color: #0f4c81; font-size: 1.55rem; font-weight: 800; }
+.vacation-complete .vacation-finish { width: 100%; padding: 13px 16px; border: 0; border-radius: 12px; cursor: pointer; font-weight: 800; }
+@keyframes vacation-appear { from { transform: scale(.65); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .vacation-check { animation: none; } }
