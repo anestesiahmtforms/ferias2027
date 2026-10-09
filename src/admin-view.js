@@ -1,3 +1,17 @@
+import { WHATSAPP_CONTACTS, WHATSAPP_INVITE_TEXT } from './whatsapp-contacts.js';
+
+export function createAdminInvite(nextInvite, appUrl) {
+  const sigla = String(nextInvite?.sigla || '').trim().toUpperCase();
+  const pin = String(nextInvite?.pin || '').trim();
+  if (!sigla || !/^\d{4}$/.test(pin)) return null;
+  return {
+    sigla,
+    pin,
+    recipient: WHATSAPP_CONTACTS[sigla] || '',
+    text: `${WHATSAPP_INVITE_TEXT}\n\nAcesse a escala: ${appUrl}\nPIN de acesso: ${pin}`
+  };
+}
+
 export function validateAdminPin(pin) {
   return /^\d{6}$/.test(String(pin || ''))
     ? { ok: true }
@@ -10,7 +24,7 @@ export function validateOverrideForm({ vaga, value, justification }) {
   return { ok: true };
 }
 
-export function openAdminPanel({ api, onRefresh = () => {} }) {
+export function openAdminPanel({ api, onRefresh = () => {}, appUrl = window.location.href }) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   backdrop.innerHTML = `<section class="booking-modal admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-title">
@@ -35,6 +49,31 @@ export function openAdminPanel({ api, onRefresh = () => {} }) {
     access.className = 'admin-ok';
     access.textContent = notice || 'Acesso autorizado. As correções administrativas não aplicam as regras normais de escolha.';
     content.append(access);
+
+    const invite = createAdminInvite(result.proximoConvite, appUrl);
+    if (invite) {
+      const inviteCard = document.createElement('section');
+      inviteCard.className = 'admin-invite';
+      const title = document.createElement('h3');
+      title.textContent = 'Próxima escolha da fila';
+      const detail = document.createElement('p');
+      detail.textContent = `Sigla ${invite.sigla} · PIN ${invite.pin}`;
+      const action = document.createElement('a');
+      action.className = 'primary admin-invite-action';
+      action.target = '_blank';
+      action.rel = 'noopener noreferrer';
+      if (invite.recipient) {
+        const destination = new URL(`https://wa.me/${invite.recipient}`);
+        destination.searchParams.set('text', invite.text);
+        action.href = destination.href;
+        action.textContent = `Enviar convite para ${invite.sigla} no WhatsApp`;
+      } else {
+        action.href = `https://wa.me/?text=${encodeURIComponent(invite.text)}`;
+        action.textContent = `Preparar convite para ${invite.sigla} no WhatsApp`;
+      }
+      inviteCard.append(title, detail, action);
+      content.append(inviteCard);
+    }
 
     const form = document.createElement('form');
     form.className = 'admin-override';
