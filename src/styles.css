@@ -93,3 +93,10 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 
 /* Convite sempre visível acima da Gestão Administrativa no celular */
 .admin-invite-overlay { position: fixed; inset: 0; z-index: 40; border-radius: 0; overflow-y: auto; }
+
+.admin-invite-controls { display: grid; gap: 10px; }
+.admin-invite-setup { display: grid; gap: 12px; text-align: left; }
+.admin-invite-setup label { display: grid; gap: 6px; font-weight: 750; }
+.admin-invite-setup input { width: 100%; padding: 12px; border: 1px solid #b8cbdc; border-radius: 10px; font-size: 16px; }
+.admin-invite-setup button { padding: 12px; border: 0; border-radius: 10px; font-weight: 800; cursor: pointer; }
+.admin-invite-setup button:disabled { opacity: .6; cursor: wait; }
