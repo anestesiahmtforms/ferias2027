@@ -45,6 +45,37 @@ export function openAdminPanel({ api, onRefresh = () => {}, appUrl = window.loca
 
   backdrop.querySelector('.modal-close').addEventListener('click', () => backdrop.remove());
 
+  function showFirstInvite(data) {
+    const invite = createAdminInvite(data, appUrl);
+    if (!invite) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'admin-invite-overlay';
+    const dialog = document.createElement('section');
+    dialog.className = 'admin-invite-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    const heading = document.createElement('h2');
+    heading.textContent = 'Iniciar segunda fase';
+    const detail = document.createElement('p');
+    detail.textContent = 'Primeiro da lista: ' + invite.sigla + ' · PIN ' + invite.pin;
+    const send = document.createElement('a');
+    send.className = 'primary admin-invite-action';
+    send.textContent = 'Enviar convite pelo WhatsApp';
+    send.target = '_blank';
+    send.rel = 'noopener noreferrer';
+    const url = new URL(invite.recipient ? 'https://wa.me/' + invite.recipient : 'https://wa.me/');
+    url.searchParams.set('text', invite.text);
+    send.href = url.href;
+    send.addEventListener('click', () => overlay.remove());
+    const dismiss = document.createElement('button');
+    dismiss.className = 'secondary';
+    dismiss.textContent = 'Agora não';
+    dismiss.addEventListener('click', () => overlay.remove());
+    dialog.append(heading, detail, send, dismiss);
+    overlay.append(dialog);
+    backdrop.append(overlay);
+  }
+
   function renderAdminContent(result, notice = '') {
     content.replaceChildren();
     const access = document.createElement('p');
@@ -237,6 +268,7 @@ export function openAdminPanel({ api, onRefresh = () => {}, appUrl = window.loca
       modal.querySelector('p').remove();
       error.remove();
       renderAdminContent(result);
+      showFirstInvite(result.proximoConvite);
     } catch (_error) {
       error.textContent = 'Falha de conexão. Tente novamente.';
       submit.disabled = false;
