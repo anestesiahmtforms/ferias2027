@@ -156,6 +156,15 @@ function obterProximaSiglaConvite_(sheet, siglaAtual, round, counts) {
   ) || '';
 }
 
+function proximoConviteAdministrativo_(sheet) {
+  const round = faseAtual_(sheet);
+  const counts = contarSemanasPorSigla_(sheet, round);
+  const sigla = primeiraPendenteSequencia_(sheet, counts, round);
+  if (!sigla) return null;
+  const pin = propriedade_('INVITE_PIN_' + sigla);
+  return /^\d{4}$/.test(pin) ? { sigla, pin } : null;
+}
+
 function definirInicioFase2_(sheet, siglaFinal) {
   const currentIndex = CONFIG.bookingSequence.indexOf(normalizar_(siglaFinal));
   let next = currentIndex >= 0
@@ -267,18 +276,10 @@ function processarReserva_(request) {
     if (sessionToken) properties.setProperty(chaveReservaSessao_(vaga.id), sessionToken);
     auditar_('reserva', sigla, request.vaga, result.codigo);
     const roundAfter = faseAtual_(sheet);
-    let nextInvite = '';
     if (state.round === 'individual' && roundAfter === 'conjunta') {
-      nextInvite = definirInicioFase2_(sheet, sigla);
-    } else {
-      const countsAfter = contarSemanasPorSigla_(sheet, state.round);
-      if (Number(countsAfter[sigla] || 0) >= limiteSemanas_(sigla, state.round)) {
-        nextInvite = obterProximaSiglaConvite_(sheet, sigla, state.round, countsAfter);
-      }
+      definirInicioFase2_(sheet, sigla);
     }
-    const response = { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, escala: carregarEscala_(sessionToken, sessionSigla || '') };
-    if (nextInvite) response.proximaSiglaConvite = nextInvite;
-    return response;
+    return { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, escala: carregarEscala_(sessionToken, sessionSigla || '') };
   } finally {
     lock.releaseLock();
   }
@@ -313,7 +314,10 @@ function processarAdmin_(request) {
   if (!verificarPin_(request.pin, propriedade_('ADMIN_PIN_HASH'), propriedade_('PIN_SALT'))) {
     return { ok: false, codigo: 'PIN_INVALIDO', mensagem: 'PIN administrativo inválido.' };
   }
-  if (request.operation === 'schedule') return { ok: true, codigo: 'OK', escala: carregarEscala_(), auditoria: lerAuditoria_(), siglas: Object.keys(mapaRegras_(planilha_().getSheetByName(CONFIG.rulesName))) };
+  if (request.operation === 'schedule') {
+    const sheet = planilha_().getSheetByName(CONFIG.sheetName);
+    return { ok: true, codigo: 'OK', escala: carregarEscala_(), auditoria: lerAuditoria_(), siglas: Object.keys(mapaRegras_(planilha_().getSheetByName(CONFIG.rulesName))), proximoConvite: proximoConviteAdministrativo_(sheet) };
+  }
   if (request.operation === 'changePin') return trocarPin_(request);
   if (request.operation === 'override') return overrideVaga_(request);
   if (request.operation === 'reopenMemberSession') return reabrirSessaoMembro_(request);
