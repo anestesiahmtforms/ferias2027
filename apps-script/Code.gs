@@ -22,7 +22,7 @@ const CONFIG = {
   rows: {
     janeiro: [5, 6, 7, 8], fevereiro: [5, 6, 7, 8], marco: [13, 14, 15, 16, 17], abril: [13, 14, 15, 16],
     maio: [22, 23, 24, 25], junho: [22, 23, 24, 25, 26], julho: [31, 32, 33, 34], agosto: [31, 32, 33, 34, 35],
-    setembro: [39, 40, 41, 42, 43], outubro: [39, 40, 41, 42], novembro: [48, 49, 50, 51, 52], dezembro: [48, 49, 50, 51, 52]
+    setembro: [39, 40, 41, 42, 43], outubro: [39, 40, 41, 42], novembro: [48, 49, 50, 51], dezembro: [48, 49, 50, 51, 52]
   },
   columns: {
     janeiro: [3, 4, 5], fevereiro: [9, 10, 11], marco: [3, 4, 5], abril: [9, 10, 11],
