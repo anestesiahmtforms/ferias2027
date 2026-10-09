@@ -157,6 +157,15 @@ function pwa_obterProximaSiglaConvite_(sheet, siglaAtual, round, counts) {
   ) || '';
 }
 
+function pwa_proximoConviteAdministrativo_(sheet) {
+  const round = pwa_faseAtual_(sheet);
+  const counts = pwa_contarSemanasPorSigla_(sheet, round);
+  const sigla = pwa_primeiraPendenteSequencia_(sheet, counts, round);
+  if (!sigla) return null;
+  const pin = pwa_propriedade_('INVITE_PIN_' + sigla);
+  return /^\d{4}$/.test(pin) ? { sigla, pin } : null;
+}
+
 function pwa_definirInicioFase2_(sheet, siglaFinal) {
   const currentIndex = pwa_CONFIG.bookingSequence.indexOf(pwa_normalizar_(siglaFinal));
   let next = currentIndex >= 0
@@ -268,18 +277,10 @@ function pwa_processarReserva_(request) {
     if (sessionToken) properties.setProperty(pwa_chaveReservaSessao_(vaga.id), sessionToken);
     pwa_auditar_('reserva', sigla, request.vaga, result.codigo);
     const roundAfter = pwa_faseAtual_(sheet);
-    let nextInvite = '';
     if (state.round === 'individual' && roundAfter === 'conjunta') {
-      nextInvite = pwa_definirInicioFase2_(sheet, sigla);
-    } else {
-      const countsAfter = pwa_contarSemanasPorSigla_(sheet, state.round);
-      if (Number(countsAfter[sigla] || 0) >= pwa_limiteSemanas_(sigla, state.round)) {
-        nextInvite = pwa_obterProximaSiglaConvite_(sheet, sigla, state.round, countsAfter);
-      }
+      pwa_definirInicioFase2_(sheet, sigla);
     }
-    const response = { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, escala: pwa_carregarEscala_(sessionToken, sessionSigla || '') };
-    if (nextInvite) response.proximaSiglaConvite = nextInvite;
-    return response;
+    return { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, escala: pwa_carregarEscala_(sessionToken, sessionSigla || '') };
   } finally {
     lock.releaseLock();
   }
@@ -314,7 +315,10 @@ function pwa_processarAdmin_(request) {
   if (!pwa_verificarPin_(request.pin, pwa_propriedade_('ADMIN_PIN_HASH'), pwa_propriedade_('PIN_SALT'))) {
     return { ok: false, codigo: 'PIN_INVALIDO', mensagem: 'PIN administrativo inválido.' };
   }
-  if (request.operation === 'schedule') return { ok: true, codigo: 'OK', escala: pwa_carregarEscala_(), auditoria: pwa_lerAuditoria_(), siglas: Object.keys(pwa_mapaRegras_(pwa_planilha_().getSheetByName(pwa_CONFIG.rulesName))) };
+  if (request.operation === 'schedule') {
+    const sheet = pwa_planilha_().getSheetByName(pwa_CONFIG.sheetName);
+    return { ok: true, codigo: 'OK', escala: pwa_carregarEscala_(), auditoria: pwa_lerAuditoria_(), siglas: Object.keys(pwa_mapaRegras_(pwa_planilha_().getSheetByName(pwa_CONFIG.rulesName))), proximoConvite: pwa_proximoConviteAdministrativo_(sheet) };
+  }
   if (request.operation === 'changePin') return pwa_trocarPin_(request);
   if (request.operation === 'override') return pwa_overrideVaga_(request);
   if (request.operation === 'reopenMemberSession') return pwa_reabrirSessaoMembro_(request);
