@@ -195,6 +195,30 @@ function vagaSigla3BloqueadaNoSabado_(aba, vaga) {
     .every(coluna => !!normalizarSigla_(aba.getRange(vaga.linha, coluna).getDisplayValue()));
 }
 
+function conferirSabadoDaSemana_(aba, vaga, sigla) {
+  const colunaPeriodo = CONFIG.colunas[vaga.mes][0] > 5 ? 8 : 2;
+  const periodo = String(aba.getRange(vaga.linha, colunaPeriodo).getDisplayValue() || '');
+  const partes = periodo.match(/\b\d{1,2}\s*A\s*(\d{1,2})\/(\d{1,2})\b/i);
+  if (!partes) return { verificado: false, tres: false };
+  const mesFinal = Number(partes[2]);
+  const anoFinal = vaga.mes === 'dezembro' && mesFinal === 1 ? 2028 : 2027;
+  const dataSabado = Utilities.formatDate(new Date(anoFinal, mesFinal - 1, Number(partes[1]) - 1), 'America/Sao_Paulo', 'dd/MM/yyyy');
+  try {
+    const planilhaSemanal = SpreadsheetApp.openById('13ymRGSscE2OOFUH6-77Q_j9J3McaDJQTIUuZVYRFbxg');
+    const abaSabado = planilhaSemanal.getSheetByName('SÁBADO');
+    if (!abaSabado || abaSabado.getLastRow() < 6) return { verificado: false, tres: false };
+    const dados = abaSabado.getRange(6, 1, abaSabado.getLastRow() - 5, 18).getDisplayValues();
+    const linha = dados.find(item => String(item[0] || '').trim() === dataSabado);
+    if (!linha) return { verificado: false, tres: false };
+    const escalados = new Set(linha.slice(1).map(normalizarSigla_).filter(Boolean));
+    const presentes = siglasDaSemana_(aba, vaga, aba.getRange(vaga.linha, vaga.coluna).getA1Notation());
+    presentes.push(sigla);
+    return { verificado: true, tres: presentes.map(normalizarSigla_).filter(item => escalados.has(item)).length >= 3 };
+  } catch (_error) {
+    return { verificado: false, tres: false };
+  }
+}
+
 function limiteSemanasPorSigla_(sigla, rodada) {
   if (rodada === 'conjunta') return CONFIG.maxSemanas;
   return CONFIG.siglasUmaSemana.includes(normalizarSigla_(sigla)) ? 1 : CONFIG.maxSemanas;
