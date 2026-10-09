@@ -21,7 +21,7 @@ const CONFIG = {
     maio: [22, 23, 24, 25], junho: [22, 23, 24, 25, 26],
     julho: [31, 32, 33, 34], agosto: [31, 32, 33, 34, 35],
     setembro: [39, 40, 41, 42, 43], outubro: [39, 40, 41, 42],
-    novembro: [48, 49, 50, 51, 52], dezembro: [48, 49, 50, 51, 52]
+    novembro: [48, 49, 50, 51], dezembro: [48, 49, 50, 51, 52]
   },
   colunas: {
     janeiro: [3, 4, 5], fevereiro: [9, 10, 11],
