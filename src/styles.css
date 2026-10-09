@@ -83,3 +83,10 @@ h1 { margin-bottom: 3px; font-size: clamp(1.35rem, 3vw, 2rem); color: #0f4c81; }
 .vacation-complete .vacation-finish { width: 100%; padding: 13px 16px; border: 0; border-radius: 12px; cursor: pointer; font-weight: 800; }
 @keyframes vacation-appear { from { transform: scale(.65); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .vacation-check { animation: none; } }
+
+.admin-invite-overlay { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; padding: 18px; background: rgba(13,43,63,.78); border-radius: 18px; }
+.admin-modal { position: relative; max-height: 92dvh; overflow-y: auto; }
+.admin-invite-dialog { display: grid; gap: 14px; width: min(100%,340px); padding: 24px; border-radius: 18px; background: #fff; text-align: center; box-shadow: 0 12px 35px #08243835; }
+.admin-invite-dialog h2 { margin: 0; color: #0f4c81; }
+.admin-invite-dialog p { font-weight: 750; }
+.admin-invite-dialog button { padding: 12px; border: 0; border-radius: 10px; font-weight: 750; cursor: pointer; }
