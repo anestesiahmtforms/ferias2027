@@ -489,6 +489,8 @@ function pwa_carregarEscala_(sessionToken, sessionSigla) {
           const existingFirstTwoOverlapDays = weekValues[0] && weekValues[1]
             ? pwa_somarCoincidenciasPorPar_(weekValues.slice(0, 2), '', rules)
             : 0;
+          const firstSlotFilled = !!weekValues[0];
+          const secondSlotFilled = !!weekValues[1];
           const sigla3BlockedBySaturday = slotIndex === 2 && firstSlotFilled && secondSlotFilled;
           const available = !value && !pwa_CONFIG.blockedMonths.includes(month) && phaseAllows && predecessorsFilled && !sigla3BlockedBySaturday;
           const explainSigla3Blocked = slotIndex === 2 && !value && !pwa_CONFIG.blockedMonths.includes(month)
