@@ -169,9 +169,7 @@ function precedentesPreenchidos_(aba, vaga, a1Ignorado = '') {
   if (vaga.indiceSigla === 0) return true;
   const primeira = aba.getRange(vaga.linha, CONFIG.colunas[vaga.mes][0]);
   if (primeira.getA1Notation() === a1Ignorado || !normalizarSigla_(primeira.getDisplayValue())) return false;
-  if (vaga.indiceSigla === 1) return true;
-  const segunda = aba.getRange(vaga.linha, CONFIG.colunas[vaga.mes][1]);
-  return segunda.getA1Notation() !== a1Ignorado && !!normalizarSigla_(segunda.getDisplayValue());
+  return true;
 }
 
 function coincidenciaPrimeirasDuasSiglas_(aba, vaga, regras) {
