@@ -4,7 +4,7 @@ export function validateBookingForm({ sigla, pin }) {
   return { ok: true };
 }
 
-export function openBookingModal(slotId, { siglas = [], session = null, startSession = async () => ({ ok: false }), submit = async () => ({ ok: false }), onSession = async () => {}, onDone = () => {}, onInvite = () => {}, onFailure = () => {} } = {}) {
+export function openBookingModal(slotId, { siglas = [], session = null, startSession = async () => ({ ok: false }), submit = async () => ({ ok: false }), onSession = async () => {}, onDone = () => {}, onFailure = () => {} } = {}) {
   return new Promise(resolve => {
     let currentSession = session;
     const backdrop = document.createElement('div');
@@ -50,7 +50,7 @@ export function openBookingModal(slotId, { siglas = [], session = null, startSes
       let result;
       try { result = await submit({ sigla: currentSession.sigla, vaga: slotId, sessionToken: currentSession.token }); }
       catch (_error) { result = { ok: false, mensagem: 'Falha de conexão. Sua sessão continua ativa; confira a escala antes de tentar novamente.' }; }
-      if (result.ok) { onDone(result); onInvite(result); close(result); }
+      if (result.ok) { onDone(result); close(result); }
       else {
         button.disabled = false;
         error.textContent = result.mensagem || 'A escolha foi recusada.';
