@@ -27,6 +27,19 @@ test('renders the spreadsheet-style date and horizontal sigla columns', () => {
   assert.match(html, /<td class="slot-cell blocked-month"><button[^>]* class="slot locked blocked-month"[^>]*><\/button><\/td>/);
 });
 
+test('does not render a blank placeholder week in August', () => {
+  const html = buildScheduleMarkup([{
+    name: 'AGOSTO',
+    weeks: [
+      { label: '4ª semana', period: '23 A 29/08', slots: [{ id: 'agosto-3-0', value: 'IG' }] },
+      { label: '5ª semana', period: '', slots: [{ id: 'agosto-4-0' }, { id: 'agosto-4-1' }, { id: 'agosto-4-2' }] }
+    ]
+  }]);
+
+  assert.match(html, /23 A 29\/08/);
+  assert.doesNotMatch(html, />5ª semana</);
+});
+
 test('API adapter sends reservation as a JSON request', async () => {
   let captured;
   const api = createApi('https://example.test', async (_url, options) => {
