@@ -46,7 +46,6 @@ export function openAdminPanel({ api, onRefresh = () => {}, appUrl = window.loca
   backdrop.querySelector('.modal-close').addEventListener('click', () => backdrop.remove());
 
   function showFirstInvite(data) {
-    const invite = createAdminInvite(data, appUrl);
     const overlay = document.createElement('div');
     overlay.className = 'admin-invite-overlay';
     const dialog = document.createElement('section');
@@ -54,31 +53,82 @@ export function openAdminPanel({ api, onRefresh = () => {}, appUrl = window.loca
     dialog.setAttribute('role', 'dialog');
     dialog.setAttribute('aria-modal', 'true');
     const heading = document.createElement('h2');
-    heading.textContent = 'Iniciar segunda fase';
+    heading.textContent = 'Convite de férias 2027';
     const detail = document.createElement('p');
-    detail.textContent = invite ? 'Primeiro da lista: ' + invite.sigla + ' · PIN ' + invite.pin : 'Convite indisponível: confira a fase atual, a ordem da fila e o PIN de convite configurado no Apps Script.';
-    const send = document.createElement('a');
-    send.className = 'primary admin-invite-action';
-    send.textContent = 'Enviar convite pelo WhatsApp';
-    send.target = '_blank';
-    send.rel = 'noopener noreferrer';
-    if (invite) {
-      const url = new URL(invite.recipient ? 'https://wa.me/' + invite.recipient : 'https://wa.me/');
-      url.searchParams.set('text', invite.text);
-      send.href = url.href;
-      send.addEventListener('click', () => overlay.remove());
-    } else {
-      send.removeAttribute('href');
-      send.setAttribute('aria-disabled', 'true');
-      send.textContent = 'WhatsApp indisponível até configurar o convite';
-    }
+    const controls = document.createElement('div');
+    controls.className = 'admin-invite-controls';
     const dismiss = document.createElement('button');
     dismiss.className = 'secondary';
+    dismiss.type = 'button';
     dismiss.textContent = 'Agora não';
     dismiss.addEventListener('click', () => overlay.remove());
-    dialog.append(heading, detail, send, dismiss);
+    dialog.append(heading, detail, controls, dismiss);
     overlay.append(dialog);
     backdrop.append(overlay);
+
+    function renderInvite(next) {
+      controls.replaceChildren();
+      const invite = createAdminInvite(next, appUrl);
+      if (invite) {
+        detail.textContent = 'Primeiro da fila: ' + invite.sigla + ' · PIN ' + invite.pin;
+        const send = document.createElement('a');
+        send.className = 'primary admin-invite-action';
+        send.textContent = 'Enviar convite pelo WhatsApp';
+        send.target = '_blank';
+        send.rel = 'noopener noreferrer';
+        const url = new URL(invite.recipient ? 'https://wa.me/' + invite.recipient : 'https://wa.me/');
+        url.searchParams.set('text', invite.text);
+        send.href = url.href;
+        send.addEventListener('click', () => overlay.remove());
+        controls.append(send);
+      } else if (next?.sigla) {
+        detail.textContent = 'Primeiro da fila: ' + next.sigla + '. Configure um PIN para habilitar o convite.';
+        const form = document.createElement('form');
+        form.className = 'admin-invite-setup';
+        const label = document.createElement('label');
+        label.textContent = 'PIN de convite (4 dígitos)';
+        const input = document.createElement('input');
+        input.inputMode = 'numeric';
+        input.maxLength = 4;
+        input.pattern = '[0-9]{4}';
+        input.required = true;
+        input.autocomplete = 'off';
+        label.append(input);
+        const errorMessage = document.createElement('p');
+        errorMessage.className = 'form-error';
+        const save = document.createElement('button');
+        save.type = 'submit';
+        save.className = 'primary';
+        save.textContent = 'Configurar PIN e preparar WhatsApp';
+        form.append(label, errorMessage, save);
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          if (!/^[0-9]{4}$/.test(input.value)) {
+            errorMessage.textContent = 'O PIN precisa conter quatro dígitos.';
+            return;
+          }
+          save.disabled = true;
+          try {
+            const result = await api.prepareInvite(next.sigla, input.value, adminPin);
+            if (!result.ok) {
+              errorMessage.textContent = result.mensagem || 'Não foi possível configurar o convite.';
+              save.disabled = false;
+              return;
+            }
+            renderInvite(result.proximoConvite);
+            const refreshed = await api.authenticateAdmin(adminPin);
+            if (refreshed.ok) renderAdminContent(refreshed);
+          } catch (_error) {
+            errorMessage.textContent = 'Falha de conexão. Verifique antes de tentar novamente.';
+            save.disabled = false;
+          }
+        });
+        controls.append(form);
+      } else {
+        detail.textContent = 'Nenhum profissional pendente foi identificado. Verifique se a segunda fase está ativa e se a escala está atualizada.';
+      }
+    }
+    renderInvite(data);
   }
 
   function renderAdminContent(result, notice = '') {
