@@ -47,7 +47,6 @@ export function openAdminPanel({ api, onRefresh = () => {}, appUrl = window.loca
 
   function showFirstInvite(data) {
     const invite = createAdminInvite(data, appUrl);
-    if (!invite) return;
     const overlay = document.createElement('div');
     overlay.className = 'admin-invite-overlay';
     const dialog = document.createElement('section');
@@ -57,16 +56,22 @@ export function openAdminPanel({ api, onRefresh = () => {}, appUrl = window.loca
     const heading = document.createElement('h2');
     heading.textContent = 'Iniciar segunda fase';
     const detail = document.createElement('p');
-    detail.textContent = 'Primeiro da lista: ' + invite.sigla + ' · PIN ' + invite.pin;
+    detail.textContent = invite ? 'Primeiro da lista: ' + invite.sigla + ' · PIN ' + invite.pin : 'Convite indisponível: confira a fase atual, a ordem da fila e o PIN de convite configurado no Apps Script.';
     const send = document.createElement('a');
     send.className = 'primary admin-invite-action';
     send.textContent = 'Enviar convite pelo WhatsApp';
     send.target = '_blank';
     send.rel = 'noopener noreferrer';
-    const url = new URL(invite.recipient ? 'https://wa.me/' + invite.recipient : 'https://wa.me/');
-    url.searchParams.set('text', invite.text);
-    send.href = url.href;
-    send.addEventListener('click', () => overlay.remove());
+    if (invite) {
+      const url = new URL(invite.recipient ? 'https://wa.me/' + invite.recipient : 'https://wa.me/');
+      url.searchParams.set('text', invite.text);
+      send.href = url.href;
+      send.addEventListener('click', () => overlay.remove());
+    } else {
+      send.removeAttribute('href');
+      send.setAttribute('aria-disabled', 'true');
+      send.textContent = 'WhatsApp indisponível até configurar o convite';
+    }
     const dismiss = document.createElement('button');
     dismiss.className = 'secondary';
     dismiss.textContent = 'Agora não';
