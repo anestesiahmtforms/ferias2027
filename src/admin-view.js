@@ -1,4 +1,6 @@
-import { WHATSAPP_CONTACTS, WHATSAPP_INVITE_TEXT } from './whatsapp-contacts.js';
+import { WHATSAPP_CONTACTS } from './whatsapp-contacts.js';
+
+const WHATSAPP_INVITE_TEXT = 'Olá! Agora é sua vez de escolher suas férias de 2027.\n\nVocê deverá selecionar *2 semanas*, respeitando as regras de coincidência: será permitida a sobreposição de até *3 dias na mesma semana*, desde que *não haja coincidência de 3 profissionais no sábado*.';
 
 export function createAdminInvite(nextInvite, appUrl) {
   const sigla = String(nextInvite?.sigla || '').trim().toUpperCase();
