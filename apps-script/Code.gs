@@ -56,7 +56,7 @@ function validarReserva_(input) {
   const data = input || {};
   const sigla = normalizar_(data.sigla);
   if (!data.allowedSiglas || !data.allowedSiglas[sigla]) return { ok: false, codigo: 'SIGLA_INVALIDA' };
-  if (CONFIG.blockedMonths.includes(String(data.month || '').trim().toLowerCase())) return { ok: false, codigo: 'MES_BLOQUEADO' };
+  if (data.round === 'individual' && CONFIG.blockedMonths.includes(String(data.month || '').trim().toLowerCase())) return { ok: false, codigo: 'MES_BLOQUEADO' };
   if (normalizar_(data.currentValue)) return { ok: false, codigo: 'VAGA_OCUPADA' };
   const maxWeeks = limiteSemanas_(sigla, data.round);
   if (Number(data.weeksForSigla || 0) >= maxWeeks) return { ok: false, codigo: 'LIMITE_SEMANAS', maxWeeks };
@@ -102,7 +102,7 @@ function limiteSemanas_(sigla, round) {
 
 function contarSemanasPorSigla_(sheet, round) {
   const counts = {};
-  Object.keys(CONFIG.rows).filter(month => !CONFIG.blockedMonths.includes(month)).forEach(month => {
+  Object.keys(CONFIG.rows).filter(month => round === 'conjunta' || !CONFIG.blockedMonths.includes(month)).forEach(month => {
     const rows = CONFIG.rows[month];
     const columns = CONFIG.columns[month];
     sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
@@ -372,7 +372,7 @@ function mensagemResultado_(result) {
 }
 
 const mensagens_ = {
-  MES_BLOQUEADO: 'Janeiro e julho estão bloqueados nesta rodada.',
+  MES_BLOQUEADO: 'Janeiro e julho são reservados na primeira fase; as vagas livres são liberadas na segunda fase.',
   VAGA_OCUPADA: 'Esta vaga já foi preenchida.',
   RODADA_INICIAL: 'As férias conjuntas ainda não estão liberadas.',
   RODADA_CONJUNTA: 'A vaga inicial desta semana ainda deve ser preenchida.',
@@ -499,7 +499,7 @@ function carregarEscala_(sessionToken, sessionSigla) {
     id: month,
     name: month.toUpperCase(),
     phase: round === 'conjunta' ? 'Férias conjuntas liberadas' : 'Rodada individual',
-    blocked: CONFIG.blockedMonths.includes(month),
+    blocked: round === 'individual' && CONFIG.blockedMonths.includes(month),
     weeks: CONFIG.rows[month].map((row, rowIndex) => {
       const right = CONFIG.columns[month][0] > 5;
       const labelColumn = right ? 7 : 1;
@@ -514,7 +514,7 @@ function carregarEscala_(sessionToken, sessionSigla) {
           const phaseAllows = round === 'individual' ? slotIndex === 0 : slotIndex > 0;
           const predecessorsFilled = slotIndex > 0 ? !!weekValues[0] : true;
           // A elegibilidade da SIGLA 3 depende da sigla escolhida; validar o sábado no servidor ao salvar.
-          const available = !value && !CONFIG.blockedMonths.includes(month) && phaseAllows && predecessorsFilled;
+          const available = !value && (round === 'conjunta' || !CONFIG.blockedMonths.includes(month)) && phaseAllows && predecessorsFilled;
           const id = month + '-' + rowIndex + '-' + slotIndex;
           const canClear = canUseMemberSession && normalizar_(value) === normalizar_(sessionSigla) && properties.getProperty(chaveReservaSessao_(id)) === sessionToken;
           const otherSiglas = CONFIG.columns[month].map((otherColumn, otherIndex) => otherIndex === slotIndex ? '' : sheet.getRange(row, otherColumn).getDisplayValue())
