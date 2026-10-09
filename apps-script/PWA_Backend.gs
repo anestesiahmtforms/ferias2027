@@ -64,6 +64,9 @@ function pwa_validarReserva_(input) {
   if (data.round === 'individual' && Number(data.slotIndex) !== 0) return { ok: false, codigo: 'RODADA_INICIAL' };
   if (data.round === 'conjunta' && Number(data.slotIndex) === 0) return { ok: false, codigo: 'RODADA_CONJUNTA' };
   if (data.round === 'conjunta' && data.slotPrerequisitesMet === false) return { ok: false, codigo: 'VAGA_ANTECEDENTE' };
+  if (data.round === 'conjunta' && Number(data.slotIndex) === 2 && (data.weekValues || []).filter(pwa_normalizar_).length >= 2) {
+    return { ok: false, codigo: 'SABADO_TRES_PROFISSIONAIS' };
+  }
   if (data.sequenceBlockedBy) {
     return {
       ok: false,
@@ -342,6 +345,8 @@ function pwa_mensagemResultado_(result) {
     ? `A soma das coincidências desta semana seria de ${pwa_formatarDias_(overlap)}; o limite é ${pwa_formatarDias_(pwa_CONFIG.maxOverlapDays)}.`
     : result.codigo === 'SIGLA3_BLOQUEADA_TOLERANCIA'
       ? `SIGLA 3 está bloqueada: SIGLA 1 e SIGLA 2 já coincidem em ${pwa_formatarDias_(overlap)}; a tolerância termina em ${pwa_formatarDias_(pwa_CONFIG.maxOverlapDays)}.`
+      : result.codigo === 'SABADO_TRES_PROFISSIONAIS'
+        ? 'Esta semana já tem duas siglas de férias. Não é permitida uma terceira marcação, pois o sábado não pode ter três profissionais de férias.'
     : result.codigo === 'LIMITE_SEMANAS'
       ? `Esta sigla já atingiu o limite de ${result.maxWeeks || 1} ${Number(result.maxWeeks || 1) === 1 ? 'semana' : 'semanas'} nesta rodada.`
       : result.codigo === 'SEQUENCIA_SIGLAS'
@@ -468,11 +473,11 @@ function pwa_carregarEscala_(sessionToken, sessionSigla) {
           const existingFirstTwoOverlapDays = weekValues[0] && weekValues[1]
             ? pwa_somarCoincidenciasPorPar_(weekValues.slice(0, 2), '', rules)
             : 0;
-          const sigla3HasTolerance = slotIndex !== 2 || existingFirstTwoOverlapDays < pwa_CONFIG.maxOverlapDays;
-          const available = !value && !pwa_CONFIG.blockedMonths.includes(month) && phaseAllows && predecessorsFilled && sigla3HasTolerance;
+          const sigla3BlockedBySaturday = slotIndex === 2 && firstSlotFilled && secondSlotFilled;
+          const available = !value && !pwa_CONFIG.blockedMonths.includes(month) && phaseAllows && predecessorsFilled && !sigla3BlockedBySaturday;
           const explainSigla3Blocked = slotIndex === 2 && !value && !pwa_CONFIG.blockedMonths.includes(month)
-            && phaseAllows && predecessorsFilled && !sigla3HasTolerance
-            ? `SIGLA 3 bloqueada: SIGLA 1 e SIGLA 2 já coincidem em ${pwa_formatarDias_(existingFirstTwoOverlapDays)}. O limite é ${pwa_formatarDias_(pwa_CONFIG.maxOverlapDays)}.`
+            && phaseAllows && predecessorsFilled && sigla3BlockedBySaturday
+            ? 'SIGLA 3 bloqueada: esta semana já tem duas siglas de férias. O sábado não pode ter três profissionais de férias.'
             : '';
           const id = month + '-' + rowIndex + '-' + slotIndex;
           const canClear = canUseMemberSession && pwa_normalizar_(value) === pwa_normalizar_(sessionSigla) && properties.getProperty(pwa_chaveReservaSessao_(id)) === sessionToken;
