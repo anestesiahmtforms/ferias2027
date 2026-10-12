@@ -90,13 +90,22 @@ test('blocks a third vacation in the same week because Saturday cannot have thre
   assert.equal(result.codigo, 'SABADO_TRES_PROFISSIONAIS');
 });
 
-test('counts Sigla 1 weeks when choosing the next invitation in the joint phase', () => {
+test('counts every sigla column when evaluating the next invitation in the joint phase', () => {
   const context = loadRules();
   vm.runInContext("CONFIG.rows = { fevereiro: [1] }; CONFIG.columns = { fevereiro: [1, 2, 3] }; CONFIG.blockedMonths = [];", context);
   const sheet = { getRange: () => ({ getDisplayValues: () => [['CR', 'AD', '']] }) };
-  const counts = context.contarSemanasPorSigla_(sheet, 'conjunta');
+  const counts = context.contarMarcacoesTotaisPorSigla_(sheet);
   assert.equal(counts.CR, 1);
   assert.equal(counts.AD, 1);
+});
+
+test('keeps a regular sigla as the current joint-phase invitation until it has four total markings', () => {
+  const context = loadRules();
+  context.ordemSequencia_ = () => ['CR', 'AD'];
+  assert.equal(context.primeiraPendenteSequencia_({}, { CR: 2, AD: 0 }, 'conjunta'), 'CR');
+  assert.equal(context.primeiraPendenteSequencia_({}, { CR: 4, AD: 0 }, 'conjunta'), 'AD');
+  assert.equal(context.metaLiberacaoFila_('CH', 'conjunta'), 0);
+  assert.equal(context.pendenteNaFila_('CH', {}, 'conjunta'), false);
 });
 
 test('sums weekday coincidences separately for each pair', () => {
