@@ -72,23 +72,31 @@ test('uses phase-specific quotas for the January/July group and other siglas', (
   assert.equal(validarReserva_({ ...base(), round: 'conjunta', slotIndex: 1, weeksForSigla: 2 }).codigo, 'LIMITE_SEMANAS');
 });
 
-test('blocks SIGLA 3 when SIGLA 1 and SIGLA 2 already use the three-day tolerance', () => {
+test('allows SIGLA 3 when the Saturday roster does not have three professionals', () => {
   const { validarReserva_ } = loadRules();
   const result = validarReserva_({
     ...base(), round: 'conjunta', slotIndex: 2,
-    slotPrerequisitesMet: true, existingFirstTwoOverlapDays: 3, overlapDays: 3
+    slotPrerequisitesMet: true, overlapDays: 3, saturdayRosterVerified: true, saturdayThree: false
   });
-  assert.equal(result.codigo, 'SIGLA3_BLOQUEADA_TOLERANCIA');
-  assert.equal(result.overlapDays, 3);
+  assert.equal(result.codigo, 'OK');
 });
 
 test('blocks a third vacation in the same week because Saturday cannot have three professionals', () => {
   const { validarReserva_ } = loadRules();
   const result = validarReserva_({
     ...base(), round: 'conjunta', slotIndex: 2,
-    slotPrerequisitesMet: true, weekValues: ['CR', 'AD', '']
+    slotPrerequisitesMet: true, weekValues: ['CR', 'AD', ''], saturdayRosterVerified: true, saturdayThree: true
   });
   assert.equal(result.codigo, 'SABADO_TRES_PROFISSIONAIS');
+});
+
+test('counts Sigla 1 weeks when choosing the next invitation in the joint phase', () => {
+  const context = loadRules();
+  vm.runInContext("CONFIG.rows = { fevereiro: [1] }; CONFIG.columns = { fevereiro: [1, 2, 3] }; CONFIG.blockedMonths = [];", context);
+  const sheet = { getRange: () => ({ getDisplayValues: () => [['CR', 'AD', '']] }) };
+  const counts = context.contarSemanasPorSigla_(sheet, 'conjunta');
+  assert.equal(counts.CR, 1);
+  assert.equal(counts.AD, 1);
 });
 
 test('sums weekday coincidences separately for each pair', () => {
