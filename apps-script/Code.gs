@@ -10,6 +10,7 @@ const CONFIG = {
   maxWeeks: 2,
   singleWeekSiglas: ['BA', 'FR', 'GB', 'L2', 'LD', 'LC', 'LU', 'MA', 'RA', 'RC', 'RO', 'WE', 'DN', 'AL'],
   bookingSequence: ['CR', 'AD', 'LH', 'FR', 'DE', 'LE', 'RO', 'AA', 'MA', 'RA', 'LU', 'LC', 'FL', 'L2', 'RL', 'MH', 'RC', 'LD', 'DN', 'WE', 'BA', 'GU', 'JA', 'IG', 'AL', 'GB'],
+  queueExemptSiglas: ['CH', 'PR', 'RU', 'LO', 'LA'],
   phase2SequenceStartProperty: 'PHASE2_SEQUENCE_START_SIGLA',
   maxOverlapDays: 3,
   saturdaySpreadsheetId: '13ymRGSscE2OOFUH6-77Q_j9J3McaDJQTIUuZVYRFbxg',
@@ -109,13 +110,39 @@ function contarSemanasPorSigla_(sheet, round) {
     const columns = CONFIG.columns[month];
     sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
       row.forEach((value, slotIndex) => {
-        if (round !== 'conjunta' && slotIndex > 0) return;
+        if (round === 'conjunta' ? slotIndex === 0 : slotIndex > 0) return;
         const sigla = normalizar_(value);
         if (sigla) counts[sigla] = (counts[sigla] || 0) + 1;
       });
     });
   });
   return counts;
+}
+
+function contarMarcacoesTotaisPorSigla_(sheet) {
+  const counts = {};
+  Object.keys(CONFIG.rows).forEach(month => {
+    const rows = CONFIG.rows[month];
+    const columns = CONFIG.columns[month];
+    sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
+      row.forEach(value => {
+        const sigla = normalizar_(value);
+        if (sigla) counts[sigla] = (counts[sigla] || 0) + 1;
+      });
+    });
+  });
+  return counts;
+}
+
+function metaLiberacaoFila_(sigla, round) {
+  const normalizada = normalizar_(sigla);
+  if (round !== 'conjunta') return limiteSemanas_(normalizada, round);
+  if (CONFIG.queueExemptSiglas.includes(normalizada)) return 0;
+  return 4;
+}
+
+function pendenteNaFila_(sigla, counts, round) {
+  return Number(counts[sigla] || 0) < metaLiberacaoFila_(sigla, round);
 }
 
 function ordemSequencia_(sheet, round) {
@@ -143,13 +170,13 @@ function antecedentePendenteSequencia_(sheet, weeksBySigla, sigla, round) {
   const index = sequence.indexOf(normalizar_(sigla));
   if (index < 0) return '';
   return sequence.slice(0, index).find(previous =>
-    Number(weeksBySigla[previous] || 0) < limiteSemanas_(previous, round)
+    pendenteNaFila_(previous, weeksBySigla, round)
   ) || '';
 }
 
 function primeiraPendenteSequencia_(sheet, counts, round) {
   return ordemSequencia_(sheet, round).find(sigla =>
-    Number(counts[sigla] || 0) < limiteSemanas_(sigla, round)
+    pendenteNaFila_(sigla, counts, round)
   ) || '';
 }
 
@@ -158,13 +185,13 @@ function obterProximaSiglaConvite_(sheet, siglaAtual, round, counts) {
   const index = sequence.indexOf(normalizar_(siglaAtual));
   if (index < 0) return '';
   return sequence.slice(index + 1).find(sigla =>
-    Number(counts[sigla] || 0) < limiteSemanas_(sigla, round)
+    pendenteNaFila_(sigla, counts, round)
   ) || '';
 }
 
 function proximoConviteAdministrativo_(sheet) {
   const round = faseAtual_(sheet);
-  const counts = contarSemanasPorSigla_(sheet, round);
+  const counts = round === 'conjunta' ? contarMarcacoesTotaisPorSigla_(sheet) : contarSemanasPorSigla_(sheet, round);
   const sigla = primeiraPendenteSequencia_(sheet, counts, round);
   if (!sigla) return null;
   const pin = propriedade_('INVITE_PIN_' + sigla);
@@ -206,7 +233,7 @@ function iniciarSessaoMembro_(request) {
     const properties = PropertiesService.getScriptProperties();
     const stateKey = chaveEstadoSessaoMembro_(sigla);
     const previousState = properties.getProperty(stateKey) || '';
-    if (previousState && previousState !== 'REOPENED') {
+    if (previousState === 'CLOSED') {
       return { ok: false, codigo: 'SESSAO_BLOQUEADA', mensagem: 'Esta sigla já encerrou a sessão de lançamento. Solicite ao administrador que a reabra.' };
     }
 
@@ -252,6 +279,17 @@ function encerrarSessaoMembro_(request) {
   }
 }
 
+function encerrarSessaoAoCompletarEscolhas_(sheet, sigla, token) {
+  if (faseAtual_(sheet) !== 'conjunta') return false;
+  const total = Number(contarMarcacoesTotaisPorSigla_(sheet)[normalizar_(sigla)] || 0);
+  if (total < metaLiberacaoFila_(sigla, 'conjunta')) return false;
+  const properties = PropertiesService.getScriptProperties();
+  properties.setProperty(chaveEstadoSessaoMembro_(sigla), 'CLOSED');
+  properties.deleteProperty(chaveSessaoMembro_(token));
+  auditar_('sessao_concluida', sigla, '', 'OK', 'Sessão encerrada após completar quatro marcações totais.');
+  return true;
+}
+
 function processarReserva_(request) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -285,7 +323,8 @@ function processarReserva_(request) {
     if (state.round === 'individual' && roundAfter === 'conjunta') {
       definirInicioFase2_(sheet, sigla);
     }
-    return { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, escala: carregarEscala_(sessionToken, sessionSigla || '') };
+    const sessionCompleted = encerrarSessaoAoCompletarEscolhas_(sheet, sigla, sessionToken);
+    return { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, sessionCompleted, escala: carregarEscala_(sessionCompleted ? '' : sessionToken, sessionCompleted ? '' : (sessionSigla || '')) };
   } finally {
     lock.releaseLock();
   }
@@ -418,8 +457,9 @@ function estadoAtual_(sheet, target, sigla) {
     : 0;
   const weeksBySigla = contarSemanasPorSigla_(sheet, round);
   const weeksForSigla = Number(weeksBySigla[sigla] || 0);
-  const sequenceBlockedBy = antecedentePendenteSequencia_(sheet, weeksBySigla, sigla, round);
-  const weeksForSequenceBlocker = sequenceBlockedBy ? limiteSemanas_(sequenceBlockedBy, round) : 0;
+  const queueCounts = round === 'conjunta' ? contarMarcacoesTotaisPorSigla_(sheet) : weeksBySigla;
+  const sequenceBlockedBy = antecedentePendenteSequencia_(sheet, queueCounts, sigla, round);
+  const weeksForSequenceBlocker = sequenceBlockedBy ? metaLiberacaoFila_(sequenceBlockedBy, round) : 0;
   const overlapDays = somarCoincidenciasPorPar_(weekValues, sigla, allowedSiglas);
   const saturdayCheck = round === 'conjunta' && target.slotIndex === 2 && firstSlotFilled && secondSlotFilled
     ? verificarSabadoSemana_(sheet, target.month, target.row, [...weekValues.slice(0, 2), sigla])
