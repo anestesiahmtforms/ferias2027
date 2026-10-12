@@ -112,11 +112,15 @@ function onEditFerias(e) {
     avisar_(range.getSheet(), sigla + ' já atingiu o limite de ' + limite + (limite === 1 ? ' semana' : ' semanas') + ' nesta rodada.');
     return;
   }
-  const antecedentePendente = antecedentePendenteSequencia_(contarSemanasPorSigla_(range.getSheet(), rodada), sigla, rodada, range.getSheet());
+  const contagemFila = rodada === 'conjunta' ? contarMarcacoesTotaisPorSigla_(range.getSheet()) : contarSemanasPorSigla_(range.getSheet(), rodada);
+  const antecedentePendente = antecedentePendenteSequencia_(contagemFila, sigla, rodada, range.getSheet());
   if (antecedentePendente) {
     range.clearContent();
-    const semanasNecessarias = limiteSemanasPorSigla_(antecedentePendente, rodada);
-    avisar_(range.getSheet(), 'Aguarde ' + antecedentePendente + ' completar a cota de ' + semanasNecessarias + (semanasNecessarias === 1 ? ' semana' : ' semanas') + ' desta rodada antes de liberar ' + sigla + '.');
+    const marcacoesNecessarias = metaLiberacaoFila_(antecedentePendente, rodada);
+    const descricao = rodada === 'conjunta'
+      ? marcacoesNecessarias + ' marcações totais'
+      : marcacoesNecessarias + (marcacoesNecessarias === 1 ? ' semana' : ' semanas') + ' desta rodada';
+    avisar_(range.getSheet(), 'Aguarde ' + antecedentePendente + ' completar ' + descricao + ' antes de liberar ' + sigla + '.');
     return;
   }
   const outrasSiglas = siglasDaSemana_(range.getSheet(), vaga, range.getA1Notation());
@@ -237,13 +241,39 @@ function contarSemanasPorSigla_(aba, rodada) {
     const colunas = CONFIG.colunas[mes];
     aba.getRange(linhas[0], colunas[0], linhas.length, colunas.length).getDisplayValues().forEach(linha => {
       linha.forEach((valor, indiceSigla) => {
-        if (rodada !== 'conjunta' && indiceSigla > 0) return;
+        if (rodada === 'conjunta' ? indiceSigla === 0 : indiceSigla > 0) return;
         const sigla = normalizarSigla_(valor);
         if (sigla) contagem[sigla] = (contagem[sigla] || 0) + 1;
       });
     });
   });
   return contagem;
+}
+
+function contarMarcacoesTotaisPorSigla_(aba) {
+  const contagem = {};
+  Object.keys(CONFIG.linhas).forEach(mes => {
+    const linhas = CONFIG.linhas[mes];
+    const colunas = CONFIG.colunas[mes];
+    aba.getRange(linhas[0], colunas[0], linhas.length, colunas.length).getDisplayValues().forEach(linha => {
+      linha.forEach(valor => {
+        const sigla = normalizarSigla_(valor);
+        if (sigla) contagem[sigla] = (contagem[sigla] || 0) + 1;
+      });
+    });
+  });
+  return contagem;
+}
+
+function metaLiberacaoFila_(sigla, rodada) {
+  const normalizada = normalizarSigla_(sigla);
+  if (rodada !== 'conjunta') return limiteSemanasPorSigla_(normalizada, rodada);
+  if (CONFIG.siglasForaDaFila.includes(normalizada)) return 0;
+  return 4;
+}
+
+function pendenteNaFila_(sigla, contagem, rodada) {
+  return Number(contagem[sigla] || 0) < metaLiberacaoFila_(sigla, rodada);
 }
 
 function ordemSequencia_(aba, rodada) {
@@ -295,7 +325,7 @@ function antecedentePendenteSequencia_(contagem, sigla, rodada, aba) {
   const indice = sequencia.indexOf(normalizarSigla_(sigla));
   if (indice < 0) return '';
   return sequencia.slice(0, indice).find(anterior =>
-    Number(contagem[anterior] || 0) < limiteSemanasPorSigla_(anterior, rodada)
+    pendenteNaFila_(anterior, contagem, rodada)
   ) || '';
 }
 
