@@ -99,6 +99,13 @@ test('counts every sigla column when evaluating the next invitation in the joint
   assert.equal(counts.AD, 1);
 });
 
+test('counts a sigla even when a group note follows it in the cell', () => {
+  const context = loadRules();
+  vm.runInContext("CONFIG.rows = { fevereiro: [1] }; CONFIG.columns = { fevereiro: [1, 2, 3] };", context);
+  const sheet = { getRange: () => ({ getDisplayValues: () => [['CR Grupo A', '', '']] }) };
+  assert.equal(context.contarMarcacoesTotaisPorSigla_(sheet).CR, 1);
+});
+
 test('keeps a regular sigla as the current joint-phase invitation until it has four total markings', () => {
   const context = loadRules();
   context.ordemSequencia_ = () => ['CR', 'AD'];
