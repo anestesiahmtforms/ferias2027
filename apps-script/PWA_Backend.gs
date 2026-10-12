@@ -11,6 +11,7 @@ const pwa_CONFIG = {
   maxWeeks: 2,
   singleWeekSiglas: ['BA', 'FR', 'GB', 'L2', 'LD', 'LC', 'LU', 'MA', 'RA', 'RC', 'RO', 'WE', 'DN', 'AL'],
   bookingSequence: ['CR', 'AD', 'LH', 'FR', 'DE', 'LE', 'RO', 'AA', 'MA', 'RA', 'LU', 'LC', 'FL', 'L2', 'RL', 'MH', 'RC', 'LD', 'DN', 'WE', 'BA', 'GU', 'JA', 'IG', 'AL', 'GB'],
+  queueExemptSiglas: ['CH', 'PR', 'RU', 'LO', 'LA'],
   phase2SequenceStartProperty: 'PHASE2_SEQUENCE_START_SIGLA',
   maxOverlapDays: 3,
   saturdaySpreadsheetId: '13ymRGSscE2OOFUH6-77Q_j9J3McaDJQTIUuZVYRFbxg',
@@ -110,13 +111,39 @@ function pwa_contarSemanasPorSigla_(sheet, round) {
     const columns = pwa_CONFIG.columns[month];
     sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
       row.forEach((value, slotIndex) => {
-        if (round !== 'conjunta' && slotIndex > 0) return;
+        if (round === 'conjunta' ? slotIndex === 0 : slotIndex > 0) return;
         const sigla = pwa_normalizar_(value);
         if (sigla) counts[sigla] = (counts[sigla] || 0) + 1;
       });
     });
   });
   return counts;
+}
+
+function pwa_contarMarcacoesTotaisPorSigla_(sheet) {
+  const counts = {};
+  Object.keys(pwa_CONFIG.rows).forEach(month => {
+    const rows = pwa_CONFIG.rows[month];
+    const columns = pwa_CONFIG.columns[month];
+    sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
+      row.forEach(value => {
+        const sigla = pwa_normalizar_(value);
+        if (sigla) counts[sigla] = (counts[sigla] || 0) + 1;
+      });
+    });
+  });
+  return counts;
+}
+
+function pwa_metaLiberacaoFila_(sigla, round) {
+  const normalizada = pwa_normalizar_(sigla);
+  if (round !== 'conjunta') return pwa_limiteSemanas_(normalizada, round);
+  if (pwa_CONFIG.queueExemptSiglas.includes(normalizada)) return 0;
+  return 4;
+}
+
+function pwa_pendenteNaFila_(sigla, counts, round) {
+  return Number(counts[sigla] || 0) < pwa_metaLiberacaoFila_(sigla, round);
 }
 
 function pwa_ordemSequencia_(sheet, round) {
@@ -144,13 +171,13 @@ function pwa_antecedentePendenteSequencia_(sheet, weeksBySigla, sigla, round) {
   const index = sequence.indexOf(pwa_normalizar_(sigla));
   if (index < 0) return '';
   return sequence.slice(0, index).find(previous =>
-    Number(weeksBySigla[previous] || 0) < pwa_limiteSemanas_(previous, round)
+    pwa_pendenteNaFila_(previous, weeksBySigla, round)
   ) || '';
 }
 
 function pwa_primeiraPendenteSequencia_(sheet, counts, round) {
   return pwa_ordemSequencia_(sheet, round).find(sigla =>
-    Number(counts[sigla] || 0) < pwa_limiteSemanas_(sigla, round)
+    pwa_pendenteNaFila_(sigla, counts, round)
   ) || '';
 }
 
@@ -159,13 +186,13 @@ function pwa_obterProximaSiglaConvite_(sheet, siglaAtual, round, counts) {
   const index = sequence.indexOf(pwa_normalizar_(siglaAtual));
   if (index < 0) return '';
   return sequence.slice(index + 1).find(sigla =>
-    Number(counts[sigla] || 0) < pwa_limiteSemanas_(sigla, round)
+    pwa_pendenteNaFila_(sigla, counts, round)
   ) || '';
 }
 
 function pwa_proximoConviteAdministrativo_(sheet) {
   const round = pwa_faseAtual_(sheet);
-  const counts = pwa_contarSemanasPorSigla_(sheet, round);
+  const counts = round === 'conjunta' ? pwa_contarMarcacoesTotaisPorSigla_(sheet) : pwa_contarSemanasPorSigla_(sheet, round);
   const sigla = pwa_primeiraPendenteSequencia_(sheet, counts, round);
   if (!sigla) return null;
   const pin = pwa_propriedade_('INVITE_PIN_' + sigla);
@@ -207,7 +234,7 @@ function pwa_iniciarSessaoMembro_(request) {
     const properties = PropertiesService.getScriptProperties();
     const stateKey = pwa_chaveEstadoSessaoMembro_(sigla);
     const previousState = properties.getProperty(stateKey) || '';
-    if (previousState && previousState !== 'REOPENED') {
+    if (previousState === 'CLOSED') {
       return { ok: false, codigo: 'SESSAO_BLOQUEADA', mensagem: 'Esta sigla já encerrou a sessão de lançamento. Solicite ao administrador que a reabra.' };
     }
 
@@ -253,6 +280,17 @@ function pwa_encerrarSessaoMembro_(request) {
   }
 }
 
+function pwa_encerrarSessaoAoCompletarEscolhas_(sheet, sigla, token) {
+  if (pwa_faseAtual_(sheet) !== 'conjunta') return false;
+  const total = Number(pwa_contarMarcacoesTotaisPorSigla_(sheet)[pwa_normalizar_(sigla)] || 0);
+  if (total < pwa_metaLiberacaoFila_(sigla, 'conjunta')) return false;
+  const properties = PropertiesService.getScriptProperties();
+  properties.setProperty(pwa_chaveEstadoSessaoMembro_(sigla), 'CLOSED');
+  properties.deleteProperty(pwa_chaveSessaoMembro_(token));
+  pwa_auditar_('sessao_concluida', sigla, '', 'OK', 'Sessão encerrada após completar quatro marcações totais.');
+  return true;
+}
+
 function pwa_processarReserva_(request) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -286,7 +324,8 @@ function pwa_processarReserva_(request) {
     if (state.round === 'individual' && roundAfter === 'conjunta') {
       pwa_definirInicioFase2_(sheet, sigla);
     }
-    return { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, escala: pwa_carregarEscala_(sessionToken, sessionSigla || '') };
+    const sessionCompleted = pwa_encerrarSessaoAoCompletarEscolhas_(sheet, sigla, sessionToken);
+    return { ok: true, codigo: 'OK', mensagem: 'Escolha confirmada.', sessionToken, sigla, sessionCompleted, escala: pwa_carregarEscala_(sessionCompleted ? '' : sessionToken, sessionCompleted ? '' : (sessionSigla || '')) };
   } finally {
     lock.releaseLock();
   }
@@ -419,8 +458,9 @@ function pwa_estadoAtual_(sheet, target, sigla) {
     : 0;
   const weeksBySigla = pwa_contarSemanasPorSigla_(sheet, round);
   const weeksForSigla = Number(weeksBySigla[sigla] || 0);
-  const sequenceBlockedBy = pwa_antecedentePendenteSequencia_(sheet, weeksBySigla, sigla, round);
-  const weeksForSequenceBlocker = sequenceBlockedBy ? pwa_limiteSemanas_(sequenceBlockedBy, round) : 0;
+  const queueCounts = round === 'conjunta' ? pwa_contarMarcacoesTotaisPorSigla_(sheet) : weeksBySigla;
+  const sequenceBlockedBy = pwa_antecedentePendenteSequencia_(sheet, queueCounts, sigla, round);
+  const weeksForSequenceBlocker = sequenceBlockedBy ? pwa_metaLiberacaoFila_(sequenceBlockedBy, round) : 0;
   const overlapDays = pwa_somarCoincidenciasPorPar_(weekValues, sigla, allowedSiglas);
   const saturdayCheck = round === 'conjunta' && target.slotIndex === 2 && firstSlotFilled && secondSlotFilled
     ? pwa_verificarSabadoSemana_(sheet, target.month, target.row, [...weekValues.slice(0, 2), sigla])
