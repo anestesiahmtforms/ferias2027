@@ -110,7 +110,7 @@ function pwa_contarSemanasPorSigla_(sheet, round) {
     const columns = pwa_CONFIG.columns[month];
     sheet.getRange(rows[0], columns[0], rows.length, columns.length).getDisplayValues().forEach(row => {
       row.forEach((value, slotIndex) => {
-        if (round === 'conjunta' ? slotIndex === 0 : slotIndex > 0) return;
+        if (round !== 'conjunta' && slotIndex > 0) return;
         const sigla = pwa_normalizar_(value);
         if (sigla) counts[sigla] = (counts[sigla] || 0) + 1;
       });
