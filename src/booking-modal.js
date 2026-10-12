@@ -15,7 +15,7 @@ export function hasCompletedVacationChoices(result, sigla) {
       }
     });
   });
-  return weeks.size >= 2;
+  return weeks.size >= 4;
 }
 
 function showCompletionBanner(backdrop, close, result) {
@@ -30,7 +30,7 @@ function showCompletionBanner(backdrop, close, result) {
   modal.querySelector('.vacation-finish').addEventListener('click', () => close(result));
 }
 
-export function openBookingModal(slotId, { siglas = [], session = null, startSession = async () => ({ ok: false }), submit = async () => ({ ok: false }), onSession = async () => {}, onDone = () => {}, onFailure = () => {} } = {}) {
+export function openBookingModal(slotId, { siglas = [], session = null, startSession = async () => ({ ok: false }), submit = async () => ({ ok: false }), onSession = async () => {}, onDone = () => {}, onComplete = () => {}, onFailure = () => {} } = {}) {
   return new Promise(resolve => {
     let currentSession = session;
     const backdrop = document.createElement('div');
@@ -78,7 +78,10 @@ export function openBookingModal(slotId, { siglas = [], session = null, startSes
       catch (_error) { result = { ok: false, mensagem: 'Falha de conexão. Sua sessão continua ativa; confira a escala antes de tentar novamente.' }; }
       if (result.ok) {
         onDone(result);
-        if (hasCompletedVacationChoices(result, currentSession.sigla)) showCompletionBanner(backdrop, close, result);
+        if (hasCompletedVacationChoices(result, currentSession.sigla)) {
+          onComplete(result);
+          showCompletionBanner(backdrop, close, result);
+        }
         else close(result);
       }
       else {
