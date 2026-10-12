@@ -3,13 +3,20 @@ import { renderApp, registerServiceWorker } from './app.js';
 import { createApi } from './api.js';
 import { openBookingModal } from './booking-modal.js';
 import { openAdminPanel } from './admin-view.js';
+import { clearMemberSession, loadMemberSession, saveMemberSession } from './member-session.js';
 
 const root = document.querySelector('#app');
 const endpoint = import.meta.env.VITE_APPS_SCRIPT_WEB_APP_URL || '';
 const api = createApi(endpoint);
-let activeSession = null;
+let activeSession = loadMemberSession(window.localStorage);
 let currentSchedule = null;
 let currentSiglas = [];
+
+function setActiveSession(session) {
+  activeSession = session;
+  if (session) saveMemberSession(window.localStorage, session);
+  else clearMemberSession(window.localStorage);
+}
 
 function renderCurrentSchedule(status = 'Escala atualizada.') {
   renderApp(root, {
@@ -38,7 +45,7 @@ async function boot() {
     const response = await api.fetchSchedule(activeSession?.token);
     if (!response.ok) {
       if (activeSession && response.codigo === 'SESSAO_ENCERRADA') {
-        activeSession = null;
+        setActiveSession(null);
         const publicResponse = await api.fetchSchedule();
         if (applyScheduleResponse(publicResponse, 'A sessão foi encerrada ou reaberta pelo administrador.')) return;
       }
@@ -55,19 +62,6 @@ function wireInteractions(siglas) {
   root.querySelector('[data-action="refresh"]')?.addEventListener('click', boot);
   root.querySelector('[data-action="admin"]')?.addEventListener('click', () => {
     openAdminPanel({ api, onRefresh: boot, appUrl: new URL(import.meta.env.BASE_URL || './', window.location.href).href });
-  });
-  root.querySelector('[data-action="end-session"]')?.addEventListener('click', async event => {
-    if (!activeSession || !window.confirm('Encerrar sua sessão? Depois disso, só o administrador poderá reabrir o acesso.')) return;
-    event.currentTarget.disabled = true;
-    const token = activeSession.token;
-    activeSession = null;
-    try {
-      const result = await api.endMemberSession(token);
-      if (!result.ok) window.alert(result.mensagem || 'A sessão não foi encerrada no servidor. Peça ao administrador que reabra o acesso.');
-    } catch (_error) {
-      window.alert('Não foi possível confirmar o encerramento. O administrador poderá reabrir o acesso se necessário.');
-    }
-    await boot();
   });
   root.querySelectorAll('[data-slot]').forEach(button => {
     if (button.dataset.blockedReason) {
@@ -94,24 +88,18 @@ function wireInteractions(siglas) {
         startSession: (sigla, pin) => api.startMemberSession(sigla, pin),
         submit: values => api.submitReservation(values),
         onSession: session => {
-          activeSession = session;
+          setActiveSession(session);
           renderCurrentSchedule('Sessão de lançamento iniciada.');
         },
         onDone: result => {
           if (!applyScheduleResponse(result)) void boot();
         },
+        onComplete: () => setActiveSession(null),
         onFailure: () => { void boot(); }
       });
     });
   });
 }
-
-window.addEventListener('pagehide', () => {
-  if (!activeSession || !endpoint || !navigator.sendBeacon) return;
-  const payload = JSON.stringify({ action: 'sessionEnd', sessionToken: activeSession.token });
-  navigator.sendBeacon(endpoint, new Blob([payload], { type: 'text/plain;charset=utf-8' }));
-  activeSession = null;
-});
 
 window.addEventListener('pageshow', event => { if (event.persisted) boot(); });
 
