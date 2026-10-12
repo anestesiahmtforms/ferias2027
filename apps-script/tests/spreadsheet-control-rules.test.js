@@ -31,6 +31,11 @@ test('direct-sheet controller uses the same phase quotas', () => {
   assert.equal(limiteSemanasPorSigla_('BA', 'conjunta'), 2);
 });
 
+test('direct-sheet controller recognizes the sigla before a group note', () => {
+  const { normalizarSigla_ } = loadControl();
+  assert.equal(normalizarSigla_('CR Grupo A'), 'CR');
+});
+
 test('direct-sheet controller blocks SIGLA 3 when SIGLA 1 and SIGLA 2 already total three days', () => {
   const { vagaSigla3BloqueadaPelaTolerancia_ } = loadControl();
   const sheet = mockSheet({ '5-9': 'CR', '5-10': 'AD' });
