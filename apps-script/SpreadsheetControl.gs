@@ -377,7 +377,7 @@ function contarDiasCoincidentes_(diasA, diasB, siglaA, siglaB) {
 }
 
 function normalizarSigla_(valor) {
-  return String(valor || '').trim().toUpperCase();
+  return String(valor || '').trim().toUpperCase().split(/\s+/)[0] || '';
 }
 
 function mapaRegras_() {
