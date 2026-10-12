@@ -237,7 +237,7 @@ function contarSemanasPorSigla_(aba, rodada) {
     const colunas = CONFIG.colunas[mes];
     aba.getRange(linhas[0], colunas[0], linhas.length, colunas.length).getDisplayValues().forEach(linha => {
       linha.forEach((valor, indiceSigla) => {
-        if (rodada === 'conjunta' ? indiceSigla === 0 : indiceSigla > 0) return;
+        if (rodada !== 'conjunta' && indiceSigla > 0) return;
         const sigla = normalizarSigla_(valor);
         if (sigla) contagem[sigla] = (contagem[sigla] || 0) + 1;
       });
