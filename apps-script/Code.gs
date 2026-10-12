@@ -395,7 +395,7 @@ function validarPinMembro_(sigla, pin) {
 function propriedade_(name) { return PropertiesService.getScriptProperties().getProperty(name) || ''; }
 function planilha_() { return SpreadsheetApp.openById(propriedade_('SPREADSHEET_ID')); }
 function resposta_(payload) { return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON); }
-function normalizar_(value) { return String(value || '').trim().toUpperCase(); }
+function normalizar_(value) { return String(value || '').trim().toUpperCase().split(/\s+/)[0] || ''; }
 function mensagemResultado_(result) {
   const overlap = Number(result.overlapDays || 0);
   const mensagem = result.codigo === 'COINCIDENCIA_DIAS'
