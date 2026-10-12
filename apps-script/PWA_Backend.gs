@@ -396,7 +396,7 @@ function pwa_validarPinMembro_(sigla, pin) {
 function pwa_propriedade_(name) { return PropertiesService.getScriptProperties().getProperty(name) || ''; }
 function pwa_planilha_() { return SpreadsheetApp.openById(pwa_propriedade_('SPREADSHEET_ID')); }
 function pwa_resposta_(payload) { return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON); }
-function pwa_normalizar_(value) { return String(value || '').trim().toUpperCase(); }
+function pwa_normalizar_(value) { return String(value || '').trim().toUpperCase().split(/\s+/)[0] || ''; }
 function pwa_mensagemResultado_(result) {
   const overlap = Number(result.overlapDays || 0);
   const mensagem = result.codigo === 'COINCIDENCIA_DIAS'
